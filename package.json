@@ -1,0 +1,25 @@
+{
+  "name": "waxtrax",
+  "version": "1.0.0",
+  "description": "Wax Rally: drive a dune buggy with a stylus under it around a record cut from real audio.",
+  "type": "module",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "music": "node tools/music.mjs",
+    "test:stylus": "node test/tone-test.mjs && node test/driver-test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.18.1"
+  }
+}

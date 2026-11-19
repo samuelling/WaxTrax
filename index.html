@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Wax Rally</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%230a0612%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27none%27 stroke=%27%2319e3ff%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23ff2a7f%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Shade&family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* One world: a neon night on black vinyl. HUD hugs the corners, the road owns the middle. */
+  --ink: #0a0612; --ink-2: #1a0d2b; --hot: #ff2a7f; --cyan: #19e3ff; --sun: #ffd23a; --paper: #fff6d8; --dim: #b8a6d6;
+  --display: "Bungee", "Arial Black", Impact, sans-serif; --shade: "Bungee Shade", "Bungee", "Arial Black", sans-serif;
+  --body: "Chakra Petch", "Trebuchet MS", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--paper); font-family: var(--body); overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, label:focus-within, .seg button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ── HUD ── */
+#hud { position: fixed; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; }
+.panel { background: linear-gradient(160deg, rgba(26,13,43,.78), rgba(10,6,18,.62)); border: 2px solid rgba(255,42,127,.55); border-radius: 14px; box-shadow: 0 0 22px rgba(255,42,127,.25), inset 0 0 18px rgba(25,227,255,.08); backdrop-filter: blur(6px); }
+.tl { position: absolute; left: max(12px, env(safe-area-inset-left)); top: 12px; display: flex; gap: 10px; align-items: center; padding: 8px 12px 8px 8px; }
+#mini { width: 96px; height: 96px; border-radius: 50%; }
+#trk { font-family: var(--display); font-size: 18px; line-height: 1.05; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#time { color: var(--cyan); font-weight: 700; font-size: 15px; margin-top: 2px; }
+#modeBadge { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; background: var(--hot); color: var(--ink); font-weight: 700; font-size: 12px; letter-spacing: .08em; }
+#modeBadge.free { background: var(--sun); }
+.tr { position: absolute; right: max(12px, env(safe-area-inset-right)); top: 10px; text-align: right; }
+#score { font-family: var(--display); font-size: clamp(26px, 4.4vw, 46px); line-height: 1; color: var(--sun); text-shadow: 3px 3px 0 var(--hot), 0 0 24px rgba(255,210,58,.5); }
+#combo { font-weight: 700; color: var(--cyan); letter-spacing: .06em; min-height: 1.2em; }
+.btns { position: absolute; right: max(12px, env(safe-area-inset-right)); top: 78px; display: flex; gap: 6px; pointer-events: auto; }
+.btns button { background: rgba(10,6,18,.7); border: 2px solid var(--cyan); border-radius: 10px; padding: 6px 10px; font-weight: 700; font-size: 12px; letter-spacing: .08em; }
+.btns button:active { background: var(--cyan); color: var(--ink); }
+.bl { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: 12px; padding: 8px; display: flex; gap: 8px; align-items: stretch; }
+#scope { width: 112px; height: 112px; border-radius: 8px; background: #05030a; }
+.lamps { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.lamps span { padding: 3px 7px; border-radius: 6px; border: 1.5px solid rgba(184,166,214,.4); color: rgba(184,166,214,.6); text-align: center; }
+.lamps span.on { color: var(--ink); background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.lamps #lampL.on { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 12px var(--hot); }
+.lamps #lampLand.on, .lamps #lampAir.on { background: var(--sun); border-color: var(--sun); box-shadow: 0 0 12px var(--sun); }
+.lamps small { color: var(--dim); font-weight: 600; text-align: center; letter-spacing: .04em; }
+.bc { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); text-align: center; }
+#rpm { font-family: var(--display); font-size: clamp(34px, 6vw, 64px); line-height: .9; text-shadow: 3px 3px 0 var(--hot), -2px -2px 0 var(--cyan), 0 0 30px rgba(255,42,127,.6); }
+#rpm.rev { color: var(--sun); }
+.rpmrow { display: flex; gap: 10px; justify-content: center; align-items: baseline; font-weight: 700; letter-spacing: .1em; font-size: 13px; }
+#pitch { color: var(--cyan); min-width: 4.5em; text-align: left; }
+#spd { color: var(--sun); min-width: 5.5em; text-align: right; }
+#strobe { width: min(46vw, 320px); height: 14px; display: block; margin: 4px auto 0; border-radius: 7px; background: #05030a; border: 1.5px solid rgba(255,42,127,.6); }
+.br { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: 12px; padding: 8px; }
+#vu { width: 150px; height: 112px; display: block; }
+#toasts { position: absolute; left: 0; right: 0; top: 17%; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.toast { font-family: var(--display); font-size: clamp(22px, 5vw, 54px); color: var(--paper); text-shadow: 4px 4px 0 var(--hot), -3px -3px 0 var(--cyan), 0 0 34px rgba(255,255,255,.5); animation: pop 1.5s cubic-bezier(.2,1.4,.3,1) forwards; white-space: nowrap; }
+.toast small { display: block; font-family: var(--body); font-weight: 700; font-size: .36em; color: var(--sun); text-shadow: none; letter-spacing: .12em; }
+@keyframes pop { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 14% { transform: scale(1.12) rotate(-3deg); opacity: 1; } 70% { transform: scale(1) rotate(-3deg); opacity: 1; } 100% { transform: scale(1.3) rotate(-3deg) translateY(-30px); opacity: 0; } }
+
+/* touch controls */
+#touch { position: absolute; inset: 0; pointer-events: none; }
+#touch .pad { position: absolute; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(25,227,255,.6); background: rgba(10,6,18,.35); display: grid; place-items: center; font-family: var(--display); font-size: 15px; color: var(--paper); }
+#tSteer { left: 18px; bottom: 150px; width: 150px; height: 150px; }
+#tSteer i { width: 56px; height: 56px; border-radius: 50%; background: var(--cyan); opacity: .8; display: block; transform: translate(var(--x, 0px), 0); box-shadow: 0 0 18px var(--cyan); }
+#tGas { right: 18px; bottom: 236px; width: 96px; height: 96px; border-color: var(--hot) !important; }
+#tBrake { right: 122px; bottom: 150px; width: 80px; height: 80px; border-color: var(--sun) !important; }
+#tBoost { right: 18px; bottom: 150px; width: 76px; height: 76px; }
+#touch .pad.on { background: rgba(255,42,127,.55); }
+body:not(.touch) #touch { display: none; }
+body.touch .bl { bottom: auto; top: 128px; transform: scale(.72); transform-origin: left top; }
+body.touch .br { bottom: auto; top: 128px; transform: scale(.72); transform-origin: right top; }
+body.touch #mini { width: 64px; height: 64px; }
+@media (max-width: 520px) { #trk { font-size: 14px; } .tl { padding: 6px 8px 6px 6px; } }
+@media (max-height: 520px) { body.touch .bl, body.touch .br { top: 104px; transform: scale(.6); } #tSteer { bottom: 24px; width: 130px; height: 130px; } #tGas { bottom: 96px; } #tBrake, #tBoost { bottom: 16px; } .bc { bottom: 4px; } }
+
+/* ── Menu ── */
+#menu { position: fixed; inset: 0; overflow-y: auto; touch-action: pan-y; display: grid; place-items: center; padding: 16px; background: radial-gradient(120% 90% at 50% 30%, rgba(10,6,18,.25), rgba(10,6,18,.86)); }
+.card { width: min(760px, 100%); padding: clamp(14px, 3vw, 26px); display: grid; gap: 14px; }
+h1 { margin: 0; font-family: var(--shade); font-weight: 400; font-size: clamp(40px, min(12vw, 17vh), 108px); line-height: .86; letter-spacing: .01em; color: var(--sun); text-shadow: 0 0 40px rgba(255,42,127,.75); text-wrap: balance; transform: rotate(-2.5deg); }
+h1 span { color: var(--hot); }
+.tag { margin: 0; font-weight: 700; font-size: clamp(14px, 2.4vw, 19px); color: var(--paper); max-width: 60ch; }
+.tag b { color: var(--cyan); }
+h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spacing: .1em; color: var(--cyan); font-weight: 400; }
+.tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.tracks button, .upload { text-align: left; padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(184,166,214,.45); background: rgba(10,6,18,.6); display: block; }
+.tracks button b, .upload b { display: block; font-family: var(--display); font-weight: 400; font-size: 15px; line-height: 1.1; }
+.tracks button small, .upload small { color: var(--dim); font-weight: 600; }
+.tracks button[aria-pressed="true"], .upload.sel { border-color: var(--hot); background: rgba(255,42,127,.22); box-shadow: 0 0 18px rgba(255,42,127,.4); }
+.upload { cursor: pointer; border-style: dashed; border-color: var(--cyan); }
+.upload input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg button { padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(184,166,214,.45); background: rgba(10,6,18,.6); text-align: left; }
+.seg button b { display: block; font-family: var(--display); font-weight: 400; font-size: 16px; }
+.seg button small { color: var(--dim); font-weight: 600; }
+.seg button[aria-pressed="true"] { border-color: var(--sun); background: rgba(255,210,58,.16); box-shadow: 0 0 18px rgba(255,210,58,.3); }
+#go { justify-self: start; font-family: var(--display); font-size: clamp(20px, 4vw, 30px); padding: 12px 26px; border-radius: 16px; border: 0; color: var(--ink); background: linear-gradient(100deg, var(--sun), var(--hot) 60%, #b12cff); box-shadow: 5px 5px 0 var(--cyan), 0 0 40px rgba(255,42,127,.6); transform: rotate(-1.5deg); }
+#go:active { transform: rotate(-1.5deg) translate(3px, 3px); box-shadow: 2px 2px 0 var(--cyan); }
+#go[disabled] { filter: grayscale(.8); opacity: .7; }
+.row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+#status { color: var(--dim); font-weight: 600; font-size: 13px; min-height: 1.3em; }
+#status.err { color: var(--sun); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px 16px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--dim); font-weight: 600; }
+.keys kbd { font-family: var(--body); font-weight: 700; color: var(--ink); background: var(--paper); border-radius: 5px; padding: 0 6px; margin-right: 2px; }
+.fine { font-size: 12px; color: var(--dim); margin: 0; max-width: 70ch; }
+#results { font-family: var(--display); color: var(--sun); font-size: clamp(16px, 3vw, 22px); }
+@media (prefers-reduced-motion: reduce) { .toast { animation-duration: .01s; } }
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="Wax Rally game view"></canvas>
+
+<div id="hud" hidden>
+  <div class="tl panel">
+    <canvas id="mini" width="192" height="192" aria-hidden="true"></canvas>
+    <div><div id="trk">Needle Drop</div><div id="time">0:00 / 0:00</div><div id="modeBadge">FOLLOW</div></div>
+  </div>
+  <div class="tr"><div id="score">000000</div><div id="combo"></div></div>
+  <div class="btns"><button id="bMode" type="button">MODE</button><button id="bCam" type="button">CAM</button><button id="bMenu" type="button">MENU</button><button id="bFull" type="button" aria-label="Full screen">⛶</button></div>
+  <div class="bl panel">
+    <canvas id="scope" width="224" height="224" aria-label="Stylus motion in the groove, seen end-on"></canvas>
+    <div class="lamps"><span id="lampL">L WALL</span><span id="lampR">R WALL</span><span id="lampLand">LAND</span><span id="lampAir">AIR</span><small>STYLUS</small></div>
+  </div>
+  <div class="bc">
+    <div id="rpm">33.3</div>
+    <div class="rpmrow"><span id="spd">0 km/h</span><span>RPM</span><span id="pitch">+0.0%</span></div>
+    <canvas id="strobe" width="640" height="28" aria-hidden="true"></canvas>
+  </div>
+  <div class="br panel"><canvas id="vu" width="300" height="224" aria-label="Output level meters"></canvas></div>
+  <div id="toasts" aria-live="polite"></div>
+  <div id="touch">
+    <div class="pad" id="tSteer"><i></i></div>
+    <div class="pad" id="tGas">GAS</div>
+    <div class="pad" id="tBrake">BRK</div>
+    <div class="pad" id="tBoost">NOS</div>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="card panel">
+    <h1>Wax <span>Rally</span></h1>
+    <p class="tag">Drive a dune buggy with a <b>diamond stylus</b> under it. The road is a record, the grooves are the song, and everything you hear is the needle's own motion.</p>
+    <div id="results" hidden></div>
+    <h2>PICK A SIDE</h2>
+    <div class="tracks" id="tracks"></div>
+    <label class="upload" id="uploadLabel"><input type="file" id="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac"><b>Cut your own record</b><small id="uploadHint">Choose or drop an audio file. It stays on your device.</small></label>
+    <h2>HOW DO YOU WANT TO RIDE</h2>
+    <div class="seg" id="modes">
+      <button type="button" data-mode="follow" aria-pressed="true"><b>Follow</b><small>Locked in the groove. You control the speed: pitch up, brake, spin it backwards.</small></button>
+      <button type="button" data-mode="free" aria-pressed="false"><b>Free drive</b><small>Steer anywhere. Climb walls, hop grooves, scrape across the whole side.</small></button>
+    </div>
+    <div class="row"><button id="go" type="button">Drop the needle</button><div id="status">Loading…</div></div>
+    <ul class="keys" id="keys">
+      <li><kbd>W</kbd><kbd>S</kbd> or <kbd>↑</kbd><kbd>↓</kbd> gas, brake / reverse</li>
+      <li><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> steer</li>
+      <li><kbd>Shift</kbd> nitro · <kbd>Space</kbd> handbrake</li>
+      <li><kbd>M</kbd> follow / free · <kbd>C</kbd> camera</li>
+      <li><kbd>R</kbd> back to the groove · <kbd>Esc</kbd> menu</li>
+    </ul>
+    <p class="fine">The three built-in tracks were synthesized from scratch for this game. Sound comes from a simulated stylus: tip mass, cantilever compliance, tracking force and one-sided contact with each 45° groove wall, followed by RIAA playback EQ.</p>
+  </div>
+</div>
+<script type="module" src="game.js"></script>
+</body>
+</html>
