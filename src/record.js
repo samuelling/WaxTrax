@@ -1,39 +1,55 @@
 import * as THREE from 'three';
-import { TAU, PITCH, DEPTH, R_END, R_LABEL, R_SPINDLE, LEAD_IN, taper } from './config.js';
+import { TAU, PITCH, DEPTH, R_END, R_LABEL, R_SPINDLE, LEAD_IN, taper, shapeF, warpH, warpAt } from './config.js';
 import { VINYL_VERT, VINYL_FRAG } from './shaders.js';
 
 function buildGeometry(L, K) {
   const pos = [], idx = [];
   const P = PITCH, D = DEPTH;
+  // disc (r, phi, height) → world, through the world's shape and warp
+  const put = (r, phi, h) => { const f = shapeF(L, phi), rw = r * f; pos.push(rw * Math.cos(phi), h * f + warpH(L, r, phi), -rw * Math.sin(phi)); };
   // spiral strip: land | wall | crease | wall | land
   const nSeg = Math.ceil(L.totalRevs * K);
   const cs = [-P / 2, -D, 0, D, P / 2];
   for (let i = 0; i <= nSeg; i++) {
-    const q = Math.min(L.totalRevs, i / K), phi = q * TAU, rc = L.R0 - q * P, tp = taper(L, q), c = Math.cos(phi), s = Math.sin(phi);
-    for (let j = 0; j < 5; j++) { const r = rc - cs[j]; pos.push(r * c, j === 2 ? -D * tp : 0, -r * s); }
+    const q = Math.min(L.totalRevs, i / K), phi = q * TAU, rc = L.R0 - q * P, tp = taper(L, q);
+    for (let j = 0; j < 5; j++) put(rc - cs[j], phi, j === 2 ? -D * tp : 0);
     if (i < nSeg) { const a = i * 5; for (let j = 0; j < 4; j++) idx.push(a + j, a + j + 1, a + 5 + j, a + j + 1, a + 5 + j + 1, a + 5 + j); }
   }
   // flat ring outside the first revolution, out to the edge
   let base = pos.length / 3;
   for (let i = 0; i <= K; i++) {
-    const fr = i / K, phi = fr * TAU, c = Math.cos(phi), s = Math.sin(phi), r0 = L.R0 + P / 2 - fr * P, r1 = L.R_EDGE;
-    pos.push(r1 * c, 0, -r1 * s, r0 * c, 0, -r0 * s);
+    const fr = i / K, phi = fr * TAU, r0 = L.R0 + P / 2 - fr * P;
+    put(L.R_EDGE, phi, 0); put(r0, phi, 0);
     if (i < K) { const a = base + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
-  // flat disc inside the last revolution (run-out area and label)
+  // disc inside the last revolution (run-out area and label), in rings so the warp can fade out
   base = pos.length / 3;
-  const frEnd = L.totalRevs - Math.floor(L.totalRevs), eps = 1e-5;
+  const frEnd = L.totalRevs - Math.floor(L.totalRevs), eps = 1e-5, NR = 6;
   for (let i = 0; i <= K; i++) {
-    const a01 = frEnd + eps + (i / K) * (1 - 2 * eps), fr = a01 - Math.floor(a01), phi = fr * TAU, c = Math.cos(phi), s = Math.sin(phi);
-    const qLast = Math.floor(L.totalRevs - fr) + fr, r0 = L.R0 - qLast * P - P / 2, r1 = 0.5;
-    pos.push(r0 * c, 0, -r0 * s, r1 * c, 0, -r1 * s);
-    if (i < K) { const a = base + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    const a01 = frEnd + eps + (i / K) * (1 - 2 * eps), fr = a01 - Math.floor(a01), phi = fr * TAU;
+    const qLast = Math.floor(L.totalRevs - fr) + fr, r0 = L.R0 - qLast * P - P / 2;
+    for (let k = 0; k < NR; k++) put(k === NR - 1 ? 0.5 : r0 + (R_LABEL + 6 - r0) * (k / (NR - 2)), phi, 0);
+    if (i < K) { const a = base + i * NR; for (let k = 0; k < NR - 1; k++) idx.push(a + k, a + k + 1, a + NR + k, a + k + 1, a + NR + k + 1, a + NR + k); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  // normals of the warped surface (the groove itself is shaded analytically)
+  const nrm = new Float32Array(pos.length), flat = !L.waves.length && !L.bowl, d = 1.2;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (flat) { nrm[i + 1] = 1; continue; }
+    const x = pos[i], z = pos[i + 2];
+    const gx = (warpAt(L, x + d, z) - warpAt(L, x - d, z)) / (2 * d), gz = (warpAt(L, x, z + d) - warpAt(L, x, z - d)) / (2 * d), il = 1 / Math.hypot(gx, 1, gz);
+    nrm[i] = -gx * il; nrm[i + 1] = il; nrm[i + 2] = -gz * il;
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   g.setIndex(idx);
   g.computeBoundingSphere();
   return g;
+}
+function buildEdge(L, bottom) {
+  const N = 240, pos = [], idx = [];
+  for (let i = 0; i <= N; i++) { const phi = i / N * TAU, f = shapeF(L, phi), rw = L.R_EDGE * f, x = rw * Math.cos(phi), z = -rw * Math.sin(phi); pos.push(x, warpH(L, L.R_EDGE, phi), z, x, bottom, z); if (i < N) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
 function arcText(ctx, text, cx, cy, radius, centerAngle, font, fill, spacing = 1, inward = false) {
@@ -96,11 +112,15 @@ export class Record {
       uLd: { value: [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0)] },
       uLc: { value: [new THREE.Vector3(2, 0.3, 1.6), new THREE.Vector3(0.2, 1.6, 2), new THREE.Vector3(1.8, 1.5, 0.2)] },
       uLabel: { value: this.labelTex },
+      uShA: { value: new THREE.Vector4() }, uShP: { value: new THREE.Vector4() }, uRLabelW: { value: R_LABEL },
+      uZen: { value: new THREE.Vector3() }, uMid: { value: new THREE.Vector3() }, uHor: { value: new THREE.Vector3() }, uSunA: { value: new THREE.Vector3() }, uSunB: { value: new THREE.Vector3() }, uMoon: { value: new THREE.Vector3() }, uFog: { value: new THREE.Vector3() },
+      uSunEl: { value: 0.2 }, uSunSize: { value: 0.25 }, uAurora: { value: 1 }, uStars: { value: 1 },
+      uVinyl: { value: new THREE.Vector3(0.01, 0.009, 0.013) }, uAmb: { value: new THREE.Vector3(0.25, 0.12, 0.3) }, uSunLight: { value: new THREE.Vector3(2.4, 1.2, 1.1) }, uHueL: { value: 0.93 }, uHueR: { value: 0.53 }, uHueSpread: { value: 0.023 },
     };
     this.material = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VINYL_VERT, fragmentShader: VINYL_FRAG, side: THREE.DoubleSide });
     // edge of the disc and the platter under it
-    this.edge = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 3, 160, 1, true), new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 0.25, metalness: 0.2 }));
-    this.edge.position.y = -1.5; scene.add(this.edge);
+    this.edge = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 0.25, metalness: 0.2, side: THREE.DoubleSide }));
+    this.edge.frustumCulled = false; scene.add(this.edge); this.platterTop = -3;
     this.platter = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 10, 160, 1, false), new THREE.MeshStandardMaterial({ color: 0x8a8f9c, roughness: 0.32, metalness: 1 }));
     this.platter.position.y = -8.01; scene.add(this.platter);
     // strobe dots around the platter rim
@@ -128,7 +148,16 @@ export class Record {
     let ss = 0; for (let i = 0; i < tex.env.length; i++) ss += tex.env[i] * tex.env[i];
     const rms = Math.sqrt(ss / tex.env.length) || 0.3;
     u.uTraceGain.value = Math.min(4, Math.max(1, 0.55 / rms));
-    this.edge.scale.set(L.R_EDGE, 1, L.R_EDGE); this.platter.scale.set(L.R_EDGE + 34, 1, L.R_EDGE + 34); this.strobe.scale.set(L.R_EDGE + 34, 1, L.R_EDGE + 34);
+    const top = this.platterTop = L.warpMin - 3, pr = L.R_EDGE * L.fMax + 34;
+    this.edge.geometry.dispose(); this.edge.geometry = buildEdge(L, top);
+    this.platter.scale.set(pr, 1, pr); this.platter.position.y = top - 5.01; this.strobe.scale.set(pr, 1, pr); this.strobe.position.y = top - 5;
+    u.uShA.value.fromArray(L.sa); u.uShP.value.fromArray(L.sp); u.uRLabelW.value = R_LABEL * L.fMin * 0.985;
+    this.setTheme(L.world.theme);
     drawLabel(this.labelCanvas, title, sub, hue); this.labelTex.needsUpdate = true;
+  }
+  setTheme(t) {
+    const u = this.uniforms;
+    for (const [k, v] of [['uZen', t.zen], ['uMid', t.mid], ['uHor', t.hor], ['uSunA', t.sunA], ['uSunB', t.sunB], ['uMoon', t.moon], ['uFog', t.fog], ['uVinyl', t.vinyl], ['uAmb', t.amb], ['uSunLight', t.sunLight]]) u[k].value.fromArray(v);
+    u.uSunEl.value = t.sunEl; u.uSunSize.value = t.sunSize; u.uAurora.value = t.aurora; u.uStars.value = t.stars; u.uHueL.value = t.hueL; u.uHueR.value = t.hueR; u.uHueSpread.value = t.hueSpread;
   }
 }

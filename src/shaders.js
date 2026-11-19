@@ -4,6 +4,8 @@ uniform float uTime;
 uniform float uSkyRot;
 uniform float uSpec[32];
 uniform float uBass;
+uniform vec3 uZen, uMid, uHor, uSunA, uSunB, uMoon, uFog;
+uniform float uSunEl, uSunSize, uAurora, uStars;
 const float TAU = 6.28318530718;
 vec3 hsv(float h, float s, float v){ vec3 k = vec3(1., 2./3., 1./3.); vec3 p = abs(fract(vec3(h)+k)*6.-3.); return v*mix(vec3(1.), clamp(p-1.,0.,1.), s); }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
@@ -11,23 +13,23 @@ vec3 skyBase(vec3 d, float detail){
   float c = cos(uSkyRot), s = sin(uSkyRot);
   d = vec3(c*d.x + s*d.z, d.y, -s*d.x + c*d.z);
   float az = atan(d.z, d.x), el = d.y;
-  vec3 zen = vec3(0.006,0.004,0.03), mid = vec3(0.07,0.012,0.16), hor = vec3(0.55,0.09,0.3);
+  vec3 zen = uZen, mid = uMid, hor = uHor;
   float t = clamp(el,0.,1.);
   vec3 col = mix(hor, mid, smoothstep(0.,.2,t)); col = mix(col, zen, smoothstep(.12,.7,t));
   col *= 0.55 + 0.3*uBass;
   // striped sun
-  vec3 sd = normalize(vec3(1., .2, 0.));
+  vec3 sd = normalize(vec3(1., uSunEl, 0.));
   float sdot = dot(d, sd), ang = acos(clamp(sdot,-1.,1.));
-  float disc = smoothstep(0.262, 0.25, ang);
+  float disc = smoothstep(uSunSize + .012, uSunSize, ang);
   float stripes = smoothstep(-.2,.2, sin((d.y-.02)*120. - uTime*.7));
-  stripes = mix(1., stripes, smoothstep(0.26, 0.1, d.y));
-  vec3 sunCol = mix(vec3(1.0,0.12,0.55), vec3(1.0,0.8,0.15), smoothstep(0.0,0.42,d.y))*2.6;
+  stripes = mix(1., stripes, smoothstep(uSunEl + .06, uSunEl - .1, d.y));
+  vec3 sunCol = mix(uSunA, uSunB, smoothstep(uSunEl - .2, uSunEl + .22, d.y))*1.6;
   col += disc*stripes*sunCol;
-  col += vec3(1.,.3,.55)*pow(max(sdot,0.),8.)*.28 + vec3(1.,.55,.3)*pow(max(sdot,0.),60.)*.5;
+  col += uSunA*pow(max(sdot,0.),8.)*.16 + uSunB*pow(max(sdot,0.),60.)*.3;
   // a second, cold moon opposite
   vec3 md = normalize(vec3(-1., .55, .4));
   float mdot = dot(d, md);
-  col += vec3(.35,.8,1.)*(smoothstep(.9965,.9972,mdot)*2.5 + pow(max(mdot,0.),30.)*.35);
+  col += uMoon*(smoothstep(.9965,.9972,mdot)*2.5 + pow(max(mdot,0.),30.)*.35);
   // spectrum skyline on the horizon
   float a01 = fract(az/TAU + .5);
   float bi = floor(a01*128.), bf = fract(a01*128.);
@@ -42,13 +44,13 @@ vec3 skyBase(vec3 d, float detail){
   // stars
   if (detail > .5 && el > .04) {
     vec2 sp = vec2(az*46., el*70.); vec2 ip = floor(sp); float r = hash12(ip); vec2 fp = fract(sp)-.5;
-    col += step(.982, r)*smoothstep(.16,.0,length(fp))*vec3(1.,.9,1.)*2.2*(.5+.5*sin(uTime*3.+r*90.));
+    col += step(.982, r)*smoothstep(.16,.0,length(fp))*vec3(1.,.9,1.)*2.2*uStars*(.5+.5*sin(uTime*3.+r*90.));
   }
   // aurora
   float au = sin(az*3. + uTime*.2 + sin(el*8.+uTime*.3)*1.5);
   float band = smoothstep(.22,.0,abs(el - (.45 + .1*au)))*(.5+.5*sin(az*14.+uTime));
-  col += hsv(.45 + .15*au, .8, 1.)*band*.16*(.5+uBass)*(.35 + .65*detail);
-  if (el < 0.) col = mix(col, vec3(0.03,0.0,0.06), smoothstep(0., -.25, el));
+  col += hsv(.45 + .15*au, .8, 1.)*band*.16*uAurora*(.5+uBass)*(.35 + .65*detail);
+  if (el < 0.) col = mix(col, uZen*1.5 + uFog*.08, smoothstep(0., -.25, el));
   return col;
 }
 `;
@@ -65,8 +67,8 @@ void main(){ gl_FragColor = vec4(skyBase(normalize(vDir), 1.), 1.); }
 `;
 
 export const VINYL_VERT = /* glsl */`
-varying vec3 vWorld;
-void main(){ vec4 w = modelMatrix * vec4(position,1.); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }
+varying vec3 vWorld; varying vec3 vNrm;
+void main(){ vec4 w = modelMatrix * vec4(position,1.); vWorld = w.xyz; vNrm = normal; gl_Position = projectionMatrix * viewMatrix * w; }
 `;
 
 export const VINYL_FRAG = /* glsl */`
@@ -79,7 +81,10 @@ uniform float uProg, uBlur, uHead, uTipGlow, uPulse;
 uniform vec3 uBuggy, uBuggyFwd, uTip, uGlowCol, uSunDir;
 uniform vec3 uLd[3]; uniform vec3 uLc[3];
 uniform sampler2D uLabel;
-varying vec3 vWorld;
+uniform vec4 uShA, uShP; uniform vec3 uVinyl, uAmb, uSunLight; uniform float uHueL, uHueR, uHueSpread, uRLabelW;
+varying vec3 vWorld; varying vec3 vNrm;
+float shapeF(float a){ return 1. + uShA.x*cos(a+uShP.x) + uShA.y*cos(2.*a+uShP.y) + uShA.z*cos(3.*a+uShP.z) + uShA.w*cos(4.*a+uShP.w); }
+float shapeD(float a){ return -(uShA.x*sin(a+uShP.x) + 2.*uShA.y*sin(2.*a+uShP.y) + 3.*uShA.z*sin(3.*a+uShP.z) + 4.*uShA.w*sin(4.*a+uShP.w)); }
 
 vec4 fetchLev(int l, float x){
   float n = uLevN[l]; float xi = floor(x); float f = x - xi;
@@ -100,23 +105,31 @@ vec3 shade(vec3 Ld, vec3 Lc){
   return Lc*(Dg*F*.095 + rb*.02 + albedo)*NL;
 }
 void main(){
-  vec2 p = vWorld.xz; float r = length(p);
+  vec2 pw = vWorld.xz; float rw = length(pw);
   V = normalize(cameraPosition - vWorld);
-  vec2 rad = p/max(r,1e-3);
-  vec3 E = vec3(-rad.x,0.,-rad.y), Tg = vec3(rad.y,0.,-rad.x), U = vec3(0.,1.,0.);
-  float phi = atan(-p.y, p.x); if (phi < 0.) phi += TAU; float fr = phi/TAU;
+  vec2 rad = pw/max(rw,1e-3);
+  float phi = atan(-pw.y, pw.x); if (phi < 0.) phi += TAU; float fr = phi/TAU;
+  // disc space: the round, flat record this world is a stretched and warped copy of
+  float sf = shapeF(phi), sd_ = shapeD(phi);
+  vec2 p = pw/sf; float r = rw/sf;
+  vec2 Ed = -rad, Td = vec2(rad.y, -rad.x);
+  // world-space frame for lighting: up is the warped surface, E points across the groove toward the spindle
+  vec3 U = normalize(vNrm);
+  vec2 g2 = rad - (sd_/sf)*Td;
+  vec3 E = -normalize(vec3(g2.x, 0., g2.y)); E = normalize(E - U*dot(E,U));
+  vec3 Tg = cross(E, U);
   float rho = (uR0 - r)/uPitch, u = rho - fr, n = floor(u+.5), e = (u-n)*uPitch, rev = n + fr;
   bool inG = rev >= 0. && rev < uTotalRevs;
   float D = uDepth*smoothstep(0.,.04,rev)*smoothstep(uTotalRevs, uTotalRevs-.04, rev);
   vec2 dx = dFdx(p), dy = dFdy(p);
-  float fT = max(abs(dot(dx,Tg.xz)), abs(dot(dy,Tg.xz)));
-  float fE = max(abs(dot(dx,E.xz)), abs(dot(dy,E.xz)));
+  float fT = max(abs(dot(dx,Td)), abs(dot(dy,Td)));
+  float fE = max(abs(dot(dx,Ed)), abs(dot(dy,Ed)));
   float far = smoothstep(.5, 2.4, fE);
-  N = U; albedo = vec3(0.010,0.009,0.013); rough = 0.1;
+  N = U; albedo = uVinyl; rough = 0.1;
   vec3 emis = vec3(0.); float ao = 1.;
-  if (r < uRLabel) {
+  if (rw < uRLabelW) {
     // paper label
-    vec2 uv = vec2(.5 + p.x/(2.*uRLabel), .5 - p.y/(2.*uRLabel));
+    vec2 uv = vec2(.5 + pw.x/(2.*uRLabelW), .5 - pw.y/(2.*uRLabelW));
     vec3 lab = texture2D(uLabel, uv).rgb;
     albedo = lab*.55; rough = .5;
     emis += lab*lab*(.12 + .5*uBass*uBass);
@@ -124,7 +137,7 @@ void main(){
     float side = e > 0. ? 1. : -1.;
     float played = smoothstep(uProg + .0015, uProg - .0015, rev);
     float front = exp(-abs(rev-uProg)*520.);
-    vec3 cL = hsv(.93 + rev*.023 + uTime*.012, .86, 1.), cR = hsv(.53 + rev*.023 + uTime*.012, .86, 1.);
+    vec3 cL = hsv(uHueL + rev*uHueSpread + uTime*uHueSpread*.5, .86, 1.), cR = hsv(uHueR + rev*uHueSpread + uTime*uHueSpread*.5, .86, 1.);
     float heat = .28 + .95*played + 1.1*front;
     if (abs(e) < D && D > .05) {
       float sw = abs(e)/D;
@@ -165,7 +178,7 @@ void main(){
     float mg = sin(r*38.)*.05*(1.-smoothstep(.01,.06,fE));
     N = normalize(U + E*mg);
     // run-out area: a few etched rings
-    float ring = smoothstep(.25,.0,abs(r - (uRLabel + 6.))) + smoothstep(.2,.0,abs(r - (uREnd - 8.)));
+    float ring = smoothstep(.25,.0,abs(r - (uRLabel + 10.))) + smoothstep(.2,.0,abs(r - (uREnd - 8.)));
     emis += vec3(.5,.3,.8)*ring*.05;
   }
   B = normalize(cross(N, Tg)); Tn = normalize(cross(B, N));
@@ -173,13 +186,13 @@ void main(){
   vec3 tb = vWorld - uBuggy; float d2 = dot(tb.xz, tb.xz);
   float shadow = 1. - .65*exp(-d2*.09)*step(vWorld.y, uBuggy.y + .6);
   vec3 col = vec3(0.);
-  col += shade(uSunDir, vec3(1.,.5,.45)*2.4)*shadow;
+  col += shade(uSunDir, uSunLight)*shadow;
   for (int i = 0; i < 3; i++) col += shade(uLd[i], uLc[i])*shadow;
   // sky reflection
   vec3 Rf = reflect(-V, N); float occ = 1.; if (Rf.y < 0.) { Rf.y = -Rf.y; occ = .35; }
   float Fe = .03 + .5*pow(1. - max(dot(N,V),0.), 4.);
   col += skyBase(Rf, 0.)*Fe*(1. - .6*rough)*occ*ao*shadow*.8;
-  col += albedo*vec3(.25,.12,.3)*ao;
+  col += albedo*uAmb*ao*(1. + .6*max(dot(N,uSunDir),0.));
   // headlights
   vec3 hp = uBuggy + U*1.1 + uBuggyFwd*1.6; vec3 th = vWorld - hp; float hd = length(th); vec3 hl = th/max(hd,1e-3);
   float cone = smoothstep(.80,.97, dot(hl, normalize(uBuggyFwd - U*.11)));
@@ -196,7 +209,7 @@ void main(){
   col += emis;
   // air perspective toward the horizon glow
   float dist = length(cameraPosition - vWorld);
-  col = mix(col, vec3(.2,.03,.13)*(.6+.3*uBass), 1. - exp(-dist*.0004));
+  col = mix(col, uFog*(.6+.3*uBass), 1. - exp(-dist*.0004));
   gl_FragColor = vec4(col, 1.);
 }
 `;

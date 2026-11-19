@@ -9,7 +9,10 @@
   "scripts": {
     "build": "node build.mjs",
     "music": "node tools/music.mjs",
-    "test:stylus": "node test/tone-test.mjs && node test/driver-test.mjs"
+    "test:stylus": "node test/tone-test.mjs && node test/driver-test.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test:online": "node test/online.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +23,7 @@
   "private": true,
   "devDependencies": {
     "esbuild": "^0.28.2",
-    "puppeteer-core": "^25.18.1"
+    "puppeteer-core": "^25.18.1",
+    "wrangler": "^4"
   }
 }

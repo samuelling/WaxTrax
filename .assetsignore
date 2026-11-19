@@ -1,0 +1,14 @@
+.git
+.gitignore
+.assetsignore
+node_modules
+src
+test
+tools
+worker
+wrangler.toml
+package.json
+package-lock.json
+build.mjs
+README.md
+.wrangler

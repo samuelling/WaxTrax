@@ -24,7 +24,7 @@ function glowTexture() {
   x.fillStyle = g; x.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); return t;
 }
 
-function makeWheel(R, W, mats, paddles) {
+function makeWheel(R, W, mats, paddles, spokes = 5) {
   const spin = new THREE.Group();
   const prof = [[R * 0.6, -W / 2], [R * 0.86, -W / 2], [R * 0.98, -W * 0.36], [R, -W * 0.2], [R, W * 0.2], [R * 0.98, W * 0.36], [R * 0.86, W / 2], [R * 0.6, W / 2]].map(p => new THREE.Vector2(p[0], p[1]));
   const tire = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), mats.rubber); tire.rotation.x = Math.PI / 2; spin.add(tire);
@@ -32,16 +32,17 @@ function makeWheel(R, W, mats, paddles) {
   for (let i = 0; i < paddles; i++) { const a = i / paddles * Math.PI * 2; p.set(Math.cos(a) * (R + 0.02), Math.sin(a) * (R + 0.02), 0); q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), a + 0.25); m.compose(p, q, s); inst.setMatrixAt(i, m); }
   spin.add(inst);
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.62, R * 0.62, W * 0.72, 20), mats.chrome); rim.rotation.x = Math.PI / 2; spin.add(rim);
-  for (let i = 0; i < 5; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(R * 1.1, 0.07, W * 0.78), mats.dark); sp.rotation.z = i / 5 * Math.PI; spin.add(sp); }
+  for (let i = 0; i < spokes; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(R * 1.1, 0.07, W * 0.78), mats.dark); sp.rotation.z = i / spokes * Math.PI; spin.add(sp); }
   for (const z of [-W * 0.38, W * 0.38]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 0.66, 0.028, 6, 36), mats.rimGlow); ring.position.z = z; spin.add(ring); }
   return spin;
 }
 
-export function buildBuggy() {
+export function buildBuggy(opts = {}) {
+  const lite = !!opts.lite;
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const mats = {
-    paint: new THREE.MeshPhysicalMaterial({ color: 0xff2a7f, metalness: 0.75, roughness: 0.26, clearcoat: 1, clearcoatRoughness: 0.06, iridescence: 1, iridescenceIOR: 1.8, iridescenceThicknessRange: [200, 700] }),
-    cage: new THREE.MeshPhysicalMaterial({ color: 0x18e0ff, metalness: 0.9, roughness: 0.2, clearcoat: 1 }),
+    paint: new THREE.MeshPhysicalMaterial({ color: opts.color ?? 0xff2a7f, metalness: 0.75, roughness: 0.26, clearcoat: 1, clearcoatRoughness: 0.06, iridescence: 1, iridescenceIOR: 1.8, iridescenceThicknessRange: [200, 700] }),
+    cage: new THREE.MeshPhysicalMaterial({ color: opts.cage ?? 0x18e0ff, metalness: 0.9, roughness: 0.2, clearcoat: 1 }),
     chrome: new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.07 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 1, roughness: 0.16 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x15151c, metalness: 0.5, roughness: 0.5 }),
@@ -78,14 +79,14 @@ export function buildBuggy() {
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 14), mats.helmet));
   const visor = new THREE.Mesh(new THREE.SphereGeometry(0.215, 16, 8, -0.9 + Math.PI / 2, 1.8, 1.15, 0.5), mats.visor); visor.rotation.y = -Math.PI / 2; head.add(visor);
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.03, 6, 18), mats.chrome); wheel.position.set(0.48, 1.12, 0); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = 0.0; driver.add(wheel);
-  for (const z of [-0.16, 0.16]) driver.add(tube([[0.02, 1.36, z * 1.3], [0.25, 1.2, z * 1.2], [0.46, 1.14, z]], 0.05, mats.dark));
+  if (!lite) for (const z of [-0.16, 0.16]) driver.add(tube([[0.02, 1.36, z * 1.3], [0.25, 1.2, z * 1.2], [0.46, 1.14, z]], 0.05, mats.dark));
   // engine, intake and exhaust
   const block = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.42, 0.78), mats.dark); block.position.set(-1.12, 1.18, 0); body.add(block);
   const blower = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.26, 0.4), mats.chrome); blower.position.set(-1.12, 1.52, 0); body.add(blower);
   const scoop = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.3, 14), mats.gold); scoop.position.set(-1.05, 1.76, 0); scoop.rotation.z = -1.2; body.add(scoop);
   const exhaustTips = [];
   for (const z of [-1, 1]) {
-    for (let i = 0; i < 3; i++) body.add(tube([[-0.92 - i * 0.2, 1.22, 0.4 * z], [-0.95 - i * 0.2, 1.3, 0.6 * z], [-1.3 - i * 0.12, 1.2 + i * 0.07, 0.74 * z], [-2.0, 1.16 + i * 0.1, 0.72 * z]], 0.05, mats.chrome));
+    for (let i = 0; i < (lite ? 1 : 3); i++) body.add(tube([[-0.92 - i * 0.2, 1.22, 0.4 * z], [-0.95 - i * 0.2, 1.3, 0.6 * z], [-1.3 - i * 0.12, 1.2 + i * 0.07, 0.74 * z], [-2.0, 1.16 + i * 0.1, 0.72 * z]], 0.05, mats.chrome));
     const tip = new THREE.Object3D(); tip.position.set(-2.02, 1.26, 0.72 * z); body.add(tip); exhaustTips.push(tip);
   }
   // lights
@@ -106,8 +107,8 @@ export function buildBuggy() {
   const defs = [[1.25, 0.54, 0.42, 1.08, true], [1.25, 0.54, 0.42, -1.08, true], [-1.2, 0.7, 0.66, 1.16, false], [-1.2, 0.7, 0.66, -1.16, false]];
   for (const [x, R, W, z, front] of defs) {
     const pivot = new THREE.Group(); pivot.position.set(x, R, z); root.add(pivot);
-    const spin = makeWheel(R, W, mats, front ? 12 : 16); pivot.add(spin);
-    const arm1 = strut(0.04, mats.chrome), arm2 = strut(0.04, mats.chrome), shock = strut(0.07, mats.spring); body.add(arm1, arm2, shock);
+    const spin = makeWheel(R, W, mats, front ? 12 : 16, lite ? 2 : 5); pivot.add(spin);
+    const arm1 = strut(0.04, mats.chrome), arm2 = strut(0.04, mats.chrome), shock = strut(0.07, mats.spring); if (!lite) body.add(arm1, arm2, shock);
     wheels.push({ pivot, spin, R, front, x, z, arm1, arm2, shock, inner: new THREE.Vector3(x, 0.5, Math.sign(z) * 0.5), top: new THREE.Vector3(x, 1.0, Math.sign(z) * 0.56), y: R });
   }
   // whip antenna with a flag
@@ -118,14 +119,14 @@ export function buildBuggy() {
   const flag = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color: 0xffe14a, side: THREE.DoubleSide })); whip.add(flag);
 
   // the pickup: cartridge body, cantilever and diamond. Its origin is the stylus tip.
-  const cart = new THREE.Group(); root.add(cart);
+  const cart = new THREE.Group(); if (!lite) root.add(cart);
   const diamond = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), mats.diamond); diamond.scale.set(0.8, 1.5, 0.8); diamond.position.y = 0.24; cart.add(diamond);
   const cantilever = strut(0.045, mats.chrome); cart.add(cantilever);
   const cartBody = new THREE.Group(); cart.add(cartBody);
   const cb = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.24, 0.42), mats.gold); cartBody.add(cb);
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 4), mats.gold); nose.rotation.z = -Math.PI / 2; nose.rotation.x = Math.PI / 4; nose.position.x = 0.5; cartBody.add(nose);
   const magnet = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.44), mats.dark); magnet.position.x = 0.12; cartBody.add(magnet);
-  const stem = strut(0.06, mats.chrome); root.add(stem);
+  const stem = strut(0.06, mats.chrome); if (!lite) root.add(stem);
   const tipGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbff8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); tipGlow.scale.setScalar(1.6); tipGlow.position.y = 0.2; cart.add(tipGlow);
 
   // exhaust flames
