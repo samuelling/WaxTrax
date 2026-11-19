@@ -48,7 +48,7 @@ export class World {
     const chrome = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.06 });
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(R_SPINDLE, R_SPINDLE, 26, 40), chrome); sp.position.y = 13; scene.add(sp);
     const cap = new THREE.Mesh(new THREE.SphereGeometry(R_SPINDLE, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), chrome); cap.position.y = 26; scene.add(cap);
-    this.ball = new THREE.Mesh(new THREE.IcosahedronGeometry(11, 3), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.05, flatShading: true, envMapIntensity: 0.55 }));
+    this.ball = new THREE.Mesh(new THREE.IcosahedronGeometry(11, 3), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.05, flatShading: true, envMapIntensity: 0.35 }));
     this.ball.position.y = 52; scene.add(this.ball);
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 4000, 6), new THREE.MeshBasicMaterial({ color: 0x331144 })); cord.position.y = 63 + 2000; scene.add(cord);
     // speaker stacks standing on the platter

@@ -47,6 +47,7 @@ export class StylusSim {
     for (let i = 0; i < 4096; i++) { const f = i / 4096; this.noise[i] = this.noise[i] * f + this.noise[(this.NMASK + 1 - 4096 + i)] * 0; } // soft start of loop
     this.noiseGain = 1;
     // record
+    this.P = GROOVE.P;
     this.dA = null; this.dB = null; this.len = 0; this.spr = fs * 10; this.leadIn = 1; this.totalRevs = 0; this.sens = 1;
     // state
     this.ys = 0; this.zs = -GROOVE.D; this.vys = 0; this.vzs = 0;
@@ -80,7 +81,7 @@ export class StylusSim {
   // yb: buggy lateral position in µm, hb: buggy ride height above the land in µm, g: load factor on the tracking force.
   process(outL, outR, n, q0, q1, yb0, yb1, hb0, hb1, g, gain) {
     const { NS, dt, mt, Ma, kc, cc, cArm, dSide, dUp, dHang, kStop, Lf, Tdown, Tup, rest, kLim, cLim, kappa, dMax, kMax, FdMax, cv, mu } = this;
-    const P = GROOVE.P, D = GROOVE.D, fs = this.fs;
+    const P = this.P, D = GROOVE.D, fs = this.fs;
     const dA = this.dA, dB = this.dB, len = this.len, spr = this.spr, leadIn = this.leadIn, totalRevs = this.totalRevs;
     const noise = this.noise, NMASK = this.NMASK, wA = this.wA, wB = this.wB, ng = this.noiseGain;
     const invN = 1 / n, invNS = 1 / NS, VTF = this.VTF * g;

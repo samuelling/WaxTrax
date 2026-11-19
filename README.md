@@ -24,6 +24,12 @@ In a race: `A/D` change lane, `Shift` uses your item (or does a trick in the air
 | Dust bunny, sweeper, gum | Spin-out |
 | Grease | Slides you sideways |
 
+## The record
+
+- **Spiral** sets how the record is wound. Long play is 10 s of music a lap at a 110 µm pitch, about a dozen big laps a song. Tight (the default) is 18 s a lap at 200 µm, and Corkscrew is 30 s a lap at 320 µm, so a song is three or four laps that visibly tighten toward the label. Real lathes cut anywhere from about 50 to 300 µm.
+- **Platter**: by default the record turns under you like a real turntable (`T` switches it). On the rails (Follow and Race) it turns at your own playback speed, so your buggy stays put like a stylus and the record streams underneath, scratches included. In Free drive it turns at a steady one lap per lap-time and carries you round.
+- Every run opens with a **fly-over**: the camera starts high over the label and spirals down onto the buggy while a comet of light runs the groove from the lead-in to the label. Any key or tap skips it.
+
 ## Worlds
 
 A record does not have to be round or flat. All groove maths happens on a round, flat disc; a world stretches each radius by a shape factor and lifts the surface by a warp height (`src/config.js`). Neon Night is the plain 12-inch, Amber Dunes is an oval with rolling warps you can catch air on, and Blue Flexi is a squared-off disc dished like a bowl.
@@ -45,7 +51,7 @@ A copy hosted somewhere else (GitHub Pages, say) can still race online: put the 
 
 ## Scale
 
-Across the groove, 1 µm of real record is about 9 cm of world, so the 110 µm pitch is a 10 m lane. Along the groove, one lap is 10 seconds of music, and the RPM readout is relative to normal pitch. The glowing trace on each wall is that channel's waveform, drawn from a mip pyramid of means and variances so distant grooves show a loudness band instead of aliasing.
+Across the groove, 1 µm of real record is about 9 cm of world, so the 110 µm pitch is a 10 m lane. Along the groove, one lap is 10, 18 or 30 seconds of music depending on the Spiral setting, and the RPM readout is relative to normal pitch. The glowing trace on each wall is that channel's waveform, drawn from a mip pyramid of means and variances so distant grooves show a loudness band instead of aliasing.
 
 ## Development
 

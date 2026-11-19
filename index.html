@@ -94,6 +94,10 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
 .upload { cursor: pointer; border-style: dashed; border-color: var(--cyan); }
 .upload input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+body.intro #hud > *:not(#toasts):not(#skip) { opacity: 0; pointer-events: none; }
+#hud > * { transition: opacity .5s; }
+#skip { display: none; position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); pointer-events: auto; background: rgba(10,6,18,.6); border: 2px solid var(--cyan); border-radius: 999px; padding: 8px 18px; font-weight: 700; letter-spacing: .12em; font-size: 13px; }
+body.intro #skip { display: block; }
 #freePanel { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 2px dashed rgba(25,227,255,.5); }
 #freePanel small { color: var(--dim); font-weight: 600; max-width: 62ch; }
 .slider { display: grid; grid-template-columns: auto 1fr 7.5em; gap: 12px; align-items: center; font-family: var(--display); font-size: 15px; color: var(--cyan); }
@@ -168,6 +172,7 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
   </div>
   <div class="br panel"><canvas id="vu" width="300" height="224" aria-label="Output level meters"></canvas></div>
   <div id="toasts" aria-live="polite"></div>
+  <button id="skip" type="button">SKIP INTRO</button>
   <div id="touch">
     <div class="pad" id="tSteer"><i></i></div>
     <div class="pad" id="tGas">GAS</div>
@@ -186,6 +191,12 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
     <label class="upload" id="uploadLabel"><input type="file" id="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac"><b>Cut your own record</b><small id="uploadHint">Choose or drop an audio file. It stays on your device.</small></label>
     <h2>PICK A WORLD</h2>
     <div class="tracks" id="worlds"></div>
+    <h2>HOW IT'S WOUND</h2>
+    <div class="tracks" id="spirals"></div>
+    <div class="seg two" id="platter">
+      <button type="button" data-p="spin" aria-pressed="true"><b>Platter spinning</b><small>The record turns under you like a real turntable. Press T to switch.</small></button>
+      <button type="button" data-p="still" aria-pressed="false"><b>Platter still</b><small>The record stays put and you drive around it.</small></button>
+    </div>
     <h2>HOW DO YOU WANT TO RIDE</h2>
     <div class="seg" id="modes">
       <button type="button" data-mode="follow" aria-pressed="true"><b>Follow</b><small>Locked in the groove. You control the speed: pitch up, brake, spin it backwards.</small></button>
@@ -216,7 +227,7 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
       <li><kbd>W</kbd><kbd>S</kbd> or <kbd>↑</kbd><kbd>↓</kbd> gas, brake / reverse</li>
       <li><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> steer</li>
       <li><kbd>Shift</kbd> nitro · <kbd>Space</kbd> handbrake</li>
-      <li><kbd>M</kbd> follow / free · <kbd>C</kbd> camera</li>
+      <li><kbd>M</kbd> follow / free · <kbd>C</kbd> camera · <kbd>T</kbd> platter</li>
       <li>Free drive: <kbd>[</kbd><kbd>]</kbd> track stickiness</li>
       <li><kbd>R</kbd> back to the groove · <kbd>Esc</kbd> menu</li>
       <li>Race: <kbd>A</kbd><kbd>D</kbd> change lane · <kbd>Shift</kbd> use item, or trick in the air</li>

@@ -1,6 +1,6 @@
 import { cutRecord, buildGrooveTexture } from './cutter.js';
 import { StylusDriver } from './driver.js';
-import { T_REV, LEAD_IN, MAX_SECONDS, makeLayout } from './config.js';
+import { LEAD_IN, MAX_SECONDS } from './config.js';
 
 export class AudioEngine {
   constructor() {
@@ -47,13 +47,14 @@ export class AudioEngine {
     const fs = ab.sampleRate, n = Math.min(ab.length, Math.floor(maxSeconds * fs));
     const L = ab.getChannelData(0).subarray(0, n), R = (ab.numberOfChannels > 1 ? ab.getChannelData(1) : ab.getChannelData(0)).subarray(0, n);
     const rec = cutRecord(L, R, fs);
-    const duration = n / fs, layout = makeLayout(duration);
+    const duration = n / fs;
     const tex = buildGrooveTexture(rec.dA, rec.dB, Math.min(texels, Math.ceil(duration * 4000)));
-    const spr = fs * T_REV;
-    tex.texPerRev = spr / tex.dec;
-    this.post({ type: 'record', dA: rec.dA, dB: rec.dB, spr, leadIn: LEAD_IN, totalRevs: layout.totalRevs, sens: rec.sens }, this.mode === 'worklet' ? [rec.dA.buffer, rec.dB.buffer] : undefined);
-    return { layout, tex, stats: rec.stats, duration, truncated: ab.length > n };
+    tex.fs = fs; this.fs = fs;
+    this.post({ type: 'record', dA: rec.dA, dB: rec.dB, spr: fs * 10, leadIn: LEAD_IN, totalRevs: 0, sens: rec.sens }, this.mode === 'worklet' ? [rec.dA.buffer, rec.dB.buffer] : undefined);
+    return { tex, stats: rec.stats, duration, truncated: ab.length > n };
   }
+  // Wind the pressing onto a layout: seconds per lap, laps, and groove pitch.
+  setLayout(L) { if (this.post && this.fs) this.post({ type: 'layout', spr: this.fs * L.tRev, totalRevs: L.totalRevs, leadIn: LEAD_IN, pitchUm: L.pitchUm }); }
   // Audio-clock time now, smooth (the context clock itself advances in steps).
   now(ms) {
     const p = (ms ?? performance.now()) / 1000; let d = this.ctx.currentTime - performance.now() / 1000;

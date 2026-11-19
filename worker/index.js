@@ -4,6 +4,7 @@
 //   GET /ws/<ROOM>   WebSocket for a room (3-8 letters or digits)
 //   anything else    the game's static files
 const MAX_PLAYERS = 8, TICK_MS = 80, RACE_GRACE_MS = 25000;
+const SPIRALS = ['lp', 'tight', 'cork'];
 const SONGS = ['needle-drop', 'dune-runner', 'wow-and-flutter', 'spindle-spin', 'crate-digger', '8-bit-platter', 'dub-plate', 'turbo-tonearm'], WORLDS = ['night', 'dunes', 'flexi'];
 
 export default {
@@ -20,7 +21,7 @@ export default {
 export class Room {
   constructor(state, env) {
     this.state = state; this.players = new Map(); this.nextId = 1; this.host = null;
-    this.cfg = { song: SONGS[0], world: WORLDS[0] }; this.phase = 'lobby'; this.timer = null; this.raceEnd = null; this.results = [];
+    this.cfg = { song: SONGS[0], world: WORLDS[0], spiral: 'tight' }; this.phase = 'lobby'; this.timer = null; this.raceEnd = null; this.results = [];
   }
   async fetch(request) {
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
@@ -56,13 +57,13 @@ export class Room {
       }
       case 'ping': this.send(p, { t: 'pong', c: m.c, now: Date.now() }); break;
       case 'cfg':
-        if (p.id === this.host && this.phase === 'lobby' && SONGS.includes(m.song) && WORLDS.includes(m.world)) { this.cfg = { song: m.song, world: m.world }; this.all({ t: 'cfg', cfg: this.cfg }); }
+        if (p.id === this.host && this.phase === 'lobby' && SONGS.includes(m.song) && WORLDS.includes(m.world)) { this.cfg = { song: m.song, world: m.world, spiral: SPIRALS.includes(m.spiral) ? m.spiral : 'tight' }; this.all({ t: 'cfg', cfg: this.cfg }); }
         break;
       case 'start':
         if (p.id === this.host && this.phase === 'lobby') {
           this.phase = 'race'; this.results = []; this.raceEnd = null;
           const ids = []; for (const q of this.players.values()) { q.s = null; q.fin = null; q.racing = q.ready; if (q.ready) ids.push(q.id); }
-          this.all({ t: 'go', at: Date.now() + 5000, now: Date.now(), seed: (Math.random() * 0x7fffffff) | 0, cfg: this.cfg, grid: ids });
+          this.all({ t: 'go', at: Date.now() + 8500, now: Date.now(), seed: (Math.random() * 0x7fffffff) | 0, cfg: this.cfg, grid: ids });
           this.startTick();
         }
         break;

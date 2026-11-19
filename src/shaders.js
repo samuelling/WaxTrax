@@ -67,8 +67,8 @@ void main(){ gl_FragColor = vec4(skyBase(normalize(vDir), 1.), 1.); }
 `;
 
 export const VINYL_VERT = /* glsl */`
-varying vec3 vWorld; varying vec3 vNrm;
-void main(){ vec4 w = modelMatrix * vec4(position,1.); vWorld = w.xyz; vNrm = normal; gl_Position = projectionMatrix * viewMatrix * w; }
+varying vec3 vWorld; varying vec3 vNrm; varying vec3 vRec;
+void main(){ vec4 w = modelMatrix * vec4(position,1.); vWorld = w.xyz; vNrm = normal; vRec = position; gl_Position = projectionMatrix * viewMatrix * w; }
 `;
 
 export const VINYL_FRAG = /* glsl */`
@@ -76,13 +76,16 @@ precision highp float;
 precision highp sampler2D;
 ${SKY_GLSL}
 uniform sampler2D uGroove; uniform float uTW; uniform float uLevOff[16]; uniform float uLevN[16]; uniform int uNumLev;
+uniform float uRot, uSweep, uSweepAmt;
 uniform float uR0, uPitch, uDepth, uTotalRevs, uLeadIn, uTexPerRev, uTraceGain, uREdge, uRLabel, uREnd;
 uniform float uProg, uBlur, uHead, uTipGlow, uPulse;
 uniform vec3 uBuggy, uBuggyFwd, uTip, uGlowCol, uSunDir;
 uniform vec3 uLd[3]; uniform vec3 uLc[3];
 uniform sampler2D uLabel;
 uniform vec4 uShA, uShP; uniform vec3 uVinyl, uAmb, uSunLight; uniform float uHueL, uHueR, uHueSpread, uRLabelW;
-varying vec3 vWorld; varying vec3 vNrm;
+varying vec3 vWorld; varying vec3 vNrm; varying vec3 vRec;
+// record space (where the groove is cut) → world space (where the platter has turned it)
+vec3 rotW(vec3 v){ float c = cos(uRot), s = sin(uRot); return vec3(c*v.x + s*v.z, v.y, -s*v.x + c*v.z); }
 float shapeF(float a){ return 1. + uShA.x*cos(a+uShP.x) + uShA.y*cos(2.*a+uShP.y) + uShA.z*cos(3.*a+uShP.z) + uShA.w*cos(4.*a+uShP.w); }
 float shapeD(float a){ return -(uShA.x*sin(a+uShP.x) + 2.*uShA.y*sin(2.*a+uShP.y) + 3.*uShA.z*sin(3.*a+uShP.z) + 4.*uShA.w*sin(4.*a+uShP.w)); }
 
@@ -105,7 +108,7 @@ vec3 shade(vec3 Ld, vec3 Lc){
   return Lc*(Dg*F*.095 + rb*.02 + albedo)*NL;
 }
 void main(){
-  vec2 pw = vWorld.xz; float rw = length(pw);
+  vec2 pw = vRec.xz; float rw = length(pw);
   V = normalize(cameraPosition - vWorld);
   vec2 rad = pw/max(rw,1e-3);
   float phi = atan(-pw.y, pw.x); if (phi < 0.) phi += TAU; float fr = phi/TAU;
@@ -114,9 +117,9 @@ void main(){
   vec2 p = pw/sf; float r = rw/sf;
   vec2 Ed = -rad, Td = vec2(rad.y, -rad.x);
   // world-space frame for lighting: up is the warped surface, E points across the groove toward the spindle
-  vec3 U = normalize(vNrm);
+  vec3 U = rotW(normalize(vNrm));
   vec2 g2 = rad - (sd_/sf)*Td;
-  vec3 E = -normalize(vec3(g2.x, 0., g2.y)); E = normalize(E - U*dot(E,U));
+  vec3 E = rotW(-normalize(vec3(g2.x, 0., g2.y))); E = normalize(E - U*dot(E,U));
   vec3 Tg = cross(E, U);
   float rho = (uR0 - r)/uPitch, u = rho - fr, n = floor(u+.5), e = (u-n)*uPitch, rev = n + fr;
   bool inG = rev >= 0. && rev < uTotalRevs;
@@ -138,7 +141,7 @@ void main(){
     float played = smoothstep(uProg + .0015, uProg - .0015, rev);
     float front = exp(-abs(rev-uProg)*520.);
     vec3 cL = hsv(uHueL + rev*uHueSpread + uTime*uHueSpread*.5, .86, 1.), cR = hsv(uHueR + rev*uHueSpread + uTime*uHueSpread*.5, .86, 1.);
-    float heat = .28 + .95*played + 1.1*front;
+    float heat = .28 + .95*played + 1.1*front + 5.*uSweepAmt*exp(-abs(rev - uSweep)*45.);
     if (abs(e) < D && D > .05) {
       float sw = abs(e)/D;
       N = normalize(U - side*E);
@@ -174,6 +177,12 @@ void main(){
     // distant grooves melt into a sheen of their average glow
     vec3 avg = (cL + cR)*.5*heat*.035;
     emis = mix(emis, avg, far); N = normalize(mix(N, U, far)); rough += far*.25; ao = mix(ao, .85, far);
+    // fly-over: a comet runs the spiral from the lead-in to the label, lighting the groove behind it
+    if (uSweepAmt > 0.) {
+      float dS = uSweep - rev, chan = smoothstep(D*1.15, D*.55, abs(e));
+      float comet = exp(-abs(dS)*70.)*7. + (dS > 0. ? exp(-dS*1.6)*.75 : 0.);
+      emis += mix(cL, vec3(1., .93, .75), .55)*comet*chan*uSweepAmt;
+    }
   } else {
     float mg = sin(r*38.)*.05*(1.-smoothstep(.01,.06,fE));
     N = normalize(U + E*mg);

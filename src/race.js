@@ -2,7 +2,7 @@
 // The groove has three lanes (outer wall, crease, inner wall). Speed tops out at normal
 // pitch, so racing well keeps the song in tune; boosts push it sharp, hits drag it flat.
 import * as THREE from 'three';
-import { TAU, T_REV, LEAD_IN, terrain, spiralFrame } from './config.js';
+import { TAU, LEAD_IN, terrain, spiralFrame } from './config.js';
 import { buildBuggy } from './buggy.js';
 
 export const ITEMS = {
@@ -23,21 +23,23 @@ function rng(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s,
 export function buildCourse(L, seed) {
   const R = rng(seed), objs = []; let id = 0;
   const add = (type, q, lane, extra) => objs.push({ id: id++, type, q, lane, lat: LANES[lane], hideUntil: -1, taken: false, ...extra });
-  const qEnd = LEAD_IN + L.musicRevs - 0.14;
-  let q = LEAD_IN + 0.16, sinceBox = 3, last = '';
+  // gaps are in seconds of music (so the course keeps its rhythm on any spiral), small offsets in metres
+  const sec = (s) => s / L.tRev, mq = (m, q) => m / (TAU * Math.max(30, L.R0 - q * L.pitch));
+  const qEnd = LEAD_IN + L.musicRevs - sec(1.4);
+  let q = LEAD_IN + sec(1.6), sinceBox = 3, last = '';
   while (q < qEnd) {
     const r = R(); sinceBox++;
     let kind = sinceBox >= 7 ? 'boxes' : r < 0.2 ? 'notes' : r < 0.36 ? 'pad' : r < 0.5 ? 'ramp' : r < 0.68 ? 'dust' : r < 0.8 ? 'grease' : r < 0.9 ? 'sweeper' : 'notes';
     if (kind === last && kind !== 'notes') kind = 'notes';
     const lane = Math.floor(R() * 3);
     if (kind === 'boxes') { for (let l = 0; l < 3; l++) add('box', q, l); sinceBox = 0; }
-    else if (kind === 'notes') for (let i = 0; i < 5; i++) add('note', q + i * 0.006, lane);
+    else if (kind === 'notes') for (let i = 0; i < 5; i++) add('note', q + i * mq(5.5, q), lane);
     else if (kind === 'pad') add('pad', q, lane);
-    else if (kind === 'ramp') { for (let l = 0; l < 3; l++) add('ramp', q, l); for (let i = 0; i < 4; i++) add('note', q + 0.014 + i * 0.007, 1, { high: true }); q += 0.03; }
-    else if (kind === 'dust') { add('dust', q, lane); if (R() < 0.45) add('dust', q + 0.004, (lane + 1 + Math.floor(R() * 2)) % 3); }
+    else if (kind === 'ramp') { for (let l = 0; l < 3; l++) add('ramp', q, l); for (let i = 0; i < 4; i++) add('note', q + mq(13 + i * 6.5, q), 1, { high: true }); q += mq(28, q); }
+    else if (kind === 'dust') { add('dust', q, lane); if (R() < 0.45) add('dust', q + mq(3.8, q), (lane + 1 + Math.floor(R() * 2)) % 3); }
     else if (kind === 'grease') add('grease', q, lane);
     else if (kind === 'sweeper') add('sweeper', q, 1, { phase: R() * TAU, speed: 1.1 + R() });
-    last = kind; q += 0.075 + R() * 0.05;
+    last = kind; q += Math.max(sec(0.75 + R() * 0.5), mq(55, q));
   }
   objs.sort((a, b) => a.q - b.q);
   return objs;
@@ -103,11 +105,12 @@ export class Race {
   // roster: [{ id, name, kind: 'me' | 'bot' | 'remote', color }]
   setup(L, seed, roster, net) {
     this.L = L; this.net = net || null; this.seed = seed; this.objs = buildCourse(L, seed); this.gums = []; this.over = false; this.phase = 'count'; this.clock = -3.5; this.goAt = null; this.said = 4; this.gumN = 0;
-    this.qFin = LEAD_IN + L.musicRevs - 0.02; this.laps = Math.max(1, Math.ceil(L.musicRevs));
+    this.sec = (s) => s / L.tRev; this.mq = (m, q) => m / (TAU * Math.max(30, L.R0 - q * L.pitch));
+    this.qFin = LEAD_IN + L.musicRevs - this.sec(0.2); this.laps = Math.max(1, Math.ceil(L.musicRevs));
     const R = rng(seed ^ 0x5bd1e995);
     for (const m of this.models) { this.group.remove(m.root); if (m.tag) this.group.remove(m.tag); } this.models = [];
     this.racers = roster.map((p, i) => {
-      const r = { id: p.id, name: p.name, kind: p.kind, color: p.color ?? COLORS[i % COLORS.length], grid: i, q: LEAD_IN - 0.1 - i * 0.007, lat: (i % 2 ? 1 : -1) * 1.0, rate: 0, vy: 0, ya: 0, pH: 0, air: 0, airT: 0, grounded: true, gload: 1,
+      const r = { id: p.id, name: p.name, kind: p.kind, color: p.color ?? COLORS[i % COLORS.length], grid: i, q: LEAD_IN - this.mq(90 + i * 6.6, LEAD_IN), lat: (i % 2 ? 1 : -1) * 1.0, rate: 0, vy: 0, ya: 0, pH: 0, air: 0, airT: 0, grounded: true, gload: 1,
         spinT: 0, spinA: 0, boostT: 0, rpmT: 0, slipT: 0, slipDir: 1, shield: false, item: null, rollT: 0, useT: 0, notes: 0, draft: 0, trick: false, fin: null, place: i + 1, oi: 0, x: 0, z: 0, yaw: 0, mPerRev: 1000, skill: 0.955 + R() * 0.05, laneT: 0, tLane: 1, thinkT: R() * 0.2, net: null, wheel: 0, botUse: 0 };
       this._frame(r); r.ya = this._ground(r); r.pH = r.ya;
       if (p.kind !== 'me') { const B = buildBuggy({ lite: true, color: r.color, cage: 0xffffff }); B.tag = nameTag(p.name, r.color); this.group.add(B.root); this.group.add(B.tag); this.models.push(B); r.model = B; }
@@ -171,9 +174,9 @@ export class Race {
     if (it === 'nitro') { r.boostT = Math.max(r.boostT, 2.6); if (me) this.fx.shake(0.4); }
     else if (it === 'rpm45') { r.rpmT = 6; r.spinT = 0; if (me) { this.fx.toast('45 RPM', 'wrong speed, right idea'); this.fx.flash(0.25); } }
     else if (it === 'sleeve') r.shield = true;
-    else if (it === 'gum') { const g = { id: `${r.id}:${this.gumN++}`, q: r.q - 0.0045, lat: r.lat, owner: r.id, born: this.clock }; this._addGum(g); if (this.net) this.net.ev({ k: 'gum', id: g.id, q: g.q, lat: g.lat }); }
+    else if (it === 'gum') { const g = { id: `${r.id}:${this.gumN++}`, q: r.q - this.mq(4.2, r.q), lat: r.lat, owner: r.id, born: this.clock }; this._addGum(g); if (this.net) this.net.ev({ k: 'gum', id: g.id, q: g.q, lat: g.lat }); }
     else if (it === 'zap') {
-      let best = null; for (const o of this.racers) { const d = o.q - r.q; if (o !== r && o.fin == null && d > 0 && d < 0.12 && (!best || d < best.q - r.q)) best = o; }
+      let best = null; for (const o of this.racers) { const d = o.q - r.q; if (o !== r && o.fin == null && d > 0 && d < this.sec(1.2) && (!best || d < best.q - r.q)) best = o; }
       this._bolt(r, best);
       if (best) { if (best.kind === 'remote') { if (this.net) this.net.ev({ k: 'zap', to: best.id }); } else this._hit(best, 'ZAPPED'); }
       else if (this.net) this.net.ev({ k: 'zap', to: null });
@@ -195,7 +198,7 @@ export class Race {
     else if (e.k === 'fin' && src) { src.fin = e.time; }
   }
   onSnapshot(states, now) {
-    for (const r of this.racers) { if (r.kind !== 'remote') continue; const s = states[r.id]; if (!s) continue; r.net = { q: s[0], lat: s[1], rate: s[2], air: s[3], fl: s[4], t: now }; if (r.q === undefined || Math.abs(r.q - s[0]) > 0.05) r.q = s[0]; }
+    for (const r of this.racers) { if (r.kind !== 'remote') continue; const s = states[r.id]; if (!s) continue; r.net = { q: s[0], lat: s[1], rate: s[2], air: s[3], fl: s[4], t: now }; if (r.q === undefined || Math.abs(r.q - s[0]) > this.sec(0.5)) r.q = s[0]; }
   }
   netState() { const m = this.me; return [+m.q.toFixed(5), +m.lat.toFixed(2), +m.rate.toFixed(3), +m.air.toFixed(2), (m.spinT > 0 ? 1 : 0) | (m.boostT > 0 ? 2 : 0) | (m.rpmT > 0 ? 4 : 0) | (m.shield ? 8 : 0) | (m.fin != null ? 16 : 0)]; }
 
@@ -203,17 +206,17 @@ export class Race {
     const c = { thr: 1, steer: 0, brake: false };
     r.thinkT -= dt;
     if (r.thinkT <= 0) {
-      r.thinkT = 0.12 + Math.random() * 0.08;
+      r.thinkT = 0.12 + Math.random() * 0.08; const H = this.sec(0.4);
       const score = [0, 0, 0]; const careless = Math.random() < 0.12;
       for (let i = r.oi; i < this.objs.length; i++) {
-        const o = this.objs[i], d = o.q - r.q; if (d > 0.04) break; if (d < 0.003) continue;
-        const near = 1 - d / 0.04;
-        if (o.type === 'sweeper') { const lt = this._sweepLat(o, this.clock + d * T_REV / Math.max(0.3, r.rate)); for (let l = 0; l < 3; l++) if (Math.abs(LANES[l] - lt) < 1.5) score[l] -= 8 * near; continue; }
+        const o = this.objs[i], d = o.q - r.q; if (d > H) break; if (d < H * 0.075) continue;
+        const near = 1 - d / H;
+        if (o.type === 'sweeper') { const lt = this._sweepLat(o, this.clock + d * this.L.tRev / Math.max(0.3, r.rate)); for (let l = 0; l < 3; l++) if (Math.abs(LANES[l] - lt) < 1.5) score[l] -= 8 * near; continue; }
         const l = o.lane;
         if (o.type === 'dust') score[l] -= (careless || r.rpmT > 0 ? 0 : 10) * near; else if (o.type === 'grease') score[l] -= 4 * near;
         else if (o.type === 'pad') score[l] += 3; else if (o.type === 'box') score[l] += r.item ? 0 : 1.5; else if (o.type === 'note' && !o.high) score[l] += 0.5;
       }
-      for (const g of this.gums) { const d = g.q - r.q; if (d > 0.003 && d < 0.04) for (let l = 0; l < 3; l++) if (Math.abs(LANES[l] - g.lat) < 1.2) score[l] -= 9; }
+      for (const g of this.gums) { const d = g.q - r.q; if (d > H * 0.075 && d < H) for (let l = 0; l < 3; l++) if (Math.abs(LANES[l] - g.lat) < 1.2) score[l] -= 9; }
       let best = r.tLane, bs = -1e9; for (let l = 0; l < 3; l++) { const sc = score[l] - Math.abs(LANES[l] - r.lat) * 0.35 + (l === r.tLane ? 0.3 : 0); if (sc > bs) { bs = sc; best = l; } }
       r.tLane = best;
     }
@@ -221,8 +224,8 @@ export class Race {
     if (r.item) {
       r.botUse += dt; const it = r.item; let go = r.botUse > 5;
       if (it === 'sleeve' || it === 'rpm45') go = r.botUse > 0.6; else if (it === 'nitro') go = r.botUse > 1.2;
-      else if (it === 'zap') go = go || (r.botUse > 0.8 && this.racers.some(o => o !== r && o.q - r.q > 0.004 && o.q - r.q < 0.1));
-      else if (it === 'gum') go = go || (r.botUse > 0.8 && this.racers.some(o => o !== r && r.q - o.q > 0.004 && r.q - o.q < 0.04));
+      else if (it === 'zap') go = go || (r.botUse > 0.8 && this.racers.some(o => o !== r && o.q - r.q > this.sec(0.04) && o.q - r.q < this.sec(1)));
+      else if (it === 'gum') go = go || (r.botUse > 0.8 && this.racers.some(o => o !== r && r.q - o.q > this.sec(0.04) && r.q - o.q < this.sec(0.4)));
       if (go) { r.botUse = 0; this.useItem(r); }
     } else r.botUse = 0;
     return c;
@@ -237,7 +240,7 @@ export class Race {
     if (r.boostT > 0) top += 0.42;
     if (r.draft > 0.4) top += 0.05;
     if (Math.abs(r.lat) > 1.8) top *= 0.94;
-    if (r.kind === 'bot') { const d = this.me ? r.q - this.me.q : 0; top *= r.skill * (d > 0.3 ? 0.965 : d < -0.3 ? 1.045 : 1); }
+    if (r.kind === 'bot') { const d = this.me ? r.q - this.me.q : 0; top *= r.skill * (d > this.sec(3) ? 0.965 : d < -this.sec(3) ? 1.045 : 1); }
     if (!racing) r.rate = 0;
     else if (r.spinT > 0) { r.rate += (0.22 - r.rate) * damp(dt, 5); r.spinT -= dt; r.spinA += dt * 14; if (r.spinT <= 0) r.spinA = 0; }
     else if (r.fin != null) r.rate += (0.75 - r.rate) * damp(dt, 0.8);
@@ -249,7 +252,7 @@ export class Race {
     let st = r.spinT > 0 ? 0 : c.steer; if (!r.grounded) st *= 0.5;
     if (r.slipT > 0) { r.slipT -= dt; st = st * 0.3 + r.slipDir * 0.55; }
     r.lat = clamp(r.lat + st * 5.8 * dt, -2.05, 2.05);
-    const q0 = r.q; r.q += r.rate * dt / T_REV;
+    const q0 = r.q; r.q += r.rate * dt / this.L.tRev;
     this._frame(r);
     // vertical: wheels on the terrain through a one-sided spring, so crests and ramps throw you
     const H = this._ground(r), pen = H - r.ya, dH = clamp((H - r.pH) / dt, -60, 16); r.pH = H;
@@ -260,7 +263,7 @@ export class Race {
     // course objects crossed this step
     const objs = this.objs;
     while (r.oi < objs.length && objs[r.oi].q <= r.q) {
-      const o = objs[r.oi++]; if (o.q < q0 - 0.002) continue;
+      const o = objs[r.oi++]; if (o.q < q0 - this.sec(0.02)) continue;
       const lat = o.type === 'sweeper' ? this._sweepLat(o, this.clock) : o.lat;
       const wdt = o.type === 'ramp' ? 1.0 : o.type === 'pad' || o.type === 'sweeper' ? 1.35 : 1.15;
       if (Math.abs(lat - r.lat) > wdt) continue;
@@ -280,8 +283,8 @@ export class Race {
   }
   _remote(r, dt) {
     const n = r.net; if (!n) return;
-    const age = (performance.now() - n.t) / 1000, tq = n.q + n.rate * Math.min(age, 0.5) / T_REV;
-    r.rate = n.rate; r.q += n.rate * dt / T_REV; r.q += (tq - r.q) * damp(dt, 8); r.lat += (n.lat - r.lat) * damp(dt, 10);
+    const age = (performance.now() - n.t) / 1000, tq = n.q + n.rate * Math.min(age, 0.5) / this.L.tRev;
+    r.rate = n.rate; r.q += n.rate * dt / this.L.tRev; r.q += (tq - r.q) * damp(dt, 8); r.lat += (n.lat - r.lat) * damp(dt, 10);
     this._frame(r); const H = this._ground(r); r.air += (n.air - r.air) * damp(dt, 12); r.ya = H + r.air; r.grounded = r.air < 0.3;
     r.spinT = n.fl & 1 ? 1 : 0; if (r.spinT) r.spinA += dt * 14; else r.spinA = 0; r.boostT = n.fl & 2 ? 1 : 0; r.rpmT = n.fl & 4 ? 1 : 0; r.shield = !!(n.fl & 8);
   }
@@ -322,7 +325,7 @@ export class Race {
     for (const o of this.objs) {
       const stat = o.type === 'pad' || o.type === 'ramp' || o.type === 'grease';
       if (stat && !all) continue;
-      if (!all && Math.abs(o.q - meQ) > 0.6) continue;     // only animate what is near
+      if (!all && Math.abs(o.q - meQ) > this.sec(6)) continue;     // only animate what is near
       const m = im[o.type]; if (o.slot >= m.instanceMatrix.count) continue;
       let hidden = false, lift = 0, spin = 0, bob = 0;
       if (o.type === 'note') { hidden = o.taken; lift = o.high ? 3.4 : 1.0; spin = t * 3 + o.q * 400; }
@@ -344,7 +347,7 @@ export class Race {
   }
 
   // per-frame visuals
-  frame(dt, time) {
+  frame(dt, time, cam) {
     if (!this.active) return;
     this._instances(dt, false);
     const hue = (time * 0.25) % 1; this.boxM.color.setHSL(hue, 1, 0.6).multiplyScalar(2.4);
@@ -358,7 +361,7 @@ export class Race {
       const roll = r.grounded ? Math.atan2(hr - hl, 2 * TRK) : 0, pitch = r.grounded ? Math.atan2(hf - hb, 2 * WB) : clamp(r.vy * 0.01, -0.2, 0.25);
       r.vroll = (r.vroll || 0) + (roll - (r.vroll || 0)) * damp(dt, 12); r.vpitch = (r.vpitch || 0) + (pitch - (r.vpitch || 0)) * damp(dt, 12);
       B.root.position.set(r.x, r.ya, r.z); B.root.rotation.order = 'YZX'; B.root.rotation.set(-r.vroll, r.yaw + r.spinA, r.vpitch);
-      r.wheel -= r.rate / T_REV * r.mPerRev * dt;
+      r.wheel -= r.rate / this.L.tRev * r.mPerRev * dt;
       for (const w of B.wheels) {
         const sg = Math.sign(w.z), wx = r.x + c * w.x + s * w.z, wz = r.z - s * w.x + c * w.z;
         const cam = r.grounded ? clamp(Math.atan2(terrain(L, wx + s * sg * 0.3, wz + c * sg * 0.3) - terrain(L, wx - s * sg * 0.3, wz - c * sg * 0.3), 0.6) - sg * r.vroll, -0.8, 0.8) : 0.1;
@@ -366,7 +369,7 @@ export class Race {
       }
       const hot = r.boostT > 0 || r.rpmT > 0; B.flames.forEach(f => { const k = 0.5 + r.rate + (hot ? 2.6 : 0) + Math.random() * 0.3; f.scale.set(k * 1.5, 0.5 + k * 0.2, 1); f.material.opacity = 0.75; });
       if (r.rpmT > 0) B.mats.paint.emissive.setHSL((time * 2) % 1, 1, 0.35); else B.mats.paint.emissive.setRGB(r.shield ? 0.1 : 0, r.shield ? 0.35 : 0, r.shield ? 0.1 : 0);
-      B.tag.position.set(r.x, r.ya + 3.4, r.z);
+      B.tag.position.set(r.x, r.ya + 3.4, r.z); B.tag.visible = !cam || Math.hypot(r.x - cam.x, r.z - cam.z) > 11;
     }
   }
 }

@@ -5,9 +5,7 @@
 // flat record); a world maps disc space to the ground by stretching each radius by a shape
 // factor f(φ) and lifting it by a warp height. Everything below converts between the two.
 export const TAU = Math.PI * 2;
-export const T_REV = 10;            // seconds of music per revolution of the game record
-export const PITCH = 10;            // m between neighbouring grooves (disc space)
-export const UM = PITCH / 110;      // m per µm
+export const UM = 10 / 110;         // m per µm across the groove (110 µm of real record = 10 m)
 export const DEPTH = 32 * UM;       // m, groove depth (= half its width: 45° walls)
 export const R_END = 92;            // m, radius where the spiral stops
 export const R_LABEL = 58;          // m, paper label
@@ -39,12 +37,23 @@ export const WORLDS = [
 ];
 export const worldById = (id) => WORLDS.find(w => w.id === id) || WORLDS[0];
 
-export function makeLayout(duration, world = WORLDS[0]) {
-  const musicRevs = duration / T_REV, totalRevs = LEAD_IN + musicRevs + LEAD_OUT;
+// How tightly the record is wound. A lap is tRev seconds of music; the groove pitch is the
+// distance between neighbouring grooves, as a real lathe would cut it (real LPs run 50–300 µm).
+// Fewer, longer laps with a wider pitch make the spiral visibly wind in toward the label.
+export const SPIRALS = [
+  { id: 'lp', name: 'Long play', blurb: '10 s a lap, fine pitch. A dozen big laps; you barely notice the drift.', tRev: 10, pitchUm: 110 },
+  { id: 'tight', name: 'Tight', blurb: '18 s a lap, wide pitch. You can feel it winding in.', tRev: 18, pitchUm: 200 },
+  { id: 'cork', name: 'Corkscrew', blurb: '30 s a lap, very wide pitch. A few laps that tighten hard toward the label.', tRev: 30, pitchUm: 320 },
+];
+export const spiralById = (id) => SPIRALS.find(s => s.id === id) || SPIRALS[1];
+
+export function makeLayout(duration, world = WORLDS[0], spiral = SPIRALS[1]) {
+  const tRev = spiral.tRev, pitch = spiral.pitchUm * UM, PITCH = pitch;
+  const musicRevs = duration / tRev, totalRevs = LEAD_IN + musicRevs + LEAD_OUT;
   const R0 = R_END + PITCH / 2 + totalRevs * PITCH;
   const a = world.shape.a, amp = Math.abs(a[0]) + Math.abs(a[1]) + Math.abs(a[2]) + Math.abs(a[3]);
   let wMin = 0; for (const w of world.waves) wMin -= Math.abs(w.A);
-  return { duration, musicRevs, totalRevs, R0, R_EDGE: R0 + PITCH / 2 + 10, world, sa: a, sp: world.shape.p, fMax: 1 + amp, fMin: 1 - amp, waves: world.waves, bowl: world.bowl, warpMin: wMin };
+  return { duration, musicRevs, totalRevs, R0, R_EDGE: R0 + PITCH / 2 + 10, tRev, pitch, pitchUm: spiral.pitchUm, spiral, world, sa: a, sp: world.shape.p, fMax: 1 + amp, fMin: 1 - amp, waves: world.waves, bowl: world.bowl, warpMin: wMin };
 }
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function taper(L, rev) { return sstep(0, 0.04, rev) * sstep(L.totalRevs, L.totalRevs - 0.04, rev); }
@@ -64,8 +73,8 @@ export function warpH(L, r, phi) {
 export function grooveAt(L, x, z, out) {
   const rw = Math.hypot(x, z); let phi = Math.atan2(-z, x); if (phi < 0) phi += TAU;
   const f = shapeF(L, phi), r = rw / f;
-  const fr = phi / TAU, rho = (L.R0 - r) / PITCH, u = rho - fr, n = Math.round(u);
-  out.rw = rw; out.f = f; out.r = r; out.phi = phi; out.fr = fr; out.rho = rho; out.n = n; out.e = (u - n) * PITCH; out.rev = n + fr;
+  const fr = phi / TAU, rho = (L.R0 - r) / L.pitch, u = rho - fr, n = Math.round(u);
+  out.rw = rw; out.f = f; out.r = r; out.phi = phi; out.fr = fr; out.rho = rho; out.n = n; out.e = (u - n) * L.pitch; out.rev = n + fr;
   out.inGroove = out.rev >= 0 && out.rev < L.totalRevs;
   return out;
 }
@@ -83,7 +92,7 @@ export function terrain(L, x, z) { const p = profile(L, x, z); return p * _g.f +
 export function warpAt(L, x, z) { grooveAt(L, x, z, _g); return warpH(L, _g.r, _g.phi); }
 // Centre line of the spiral at q revolutions from its start; lateral is in disc metres toward the spindle.
 export function spiralPoint(L, q, out, lateral = 0) {
-  const phi = q * TAU, r = L.R0 - q * PITCH - lateral, f = shapeF(L, phi), rw = r * f;
+  const phi = q * TAU, r = L.R0 - q * L.pitch - lateral, f = shapeF(L, phi), rw = r * f;
   out.x = rw * Math.cos(phi); out.z = -rw * Math.sin(phi); out.r = r; out.phi = phi; out.f = f; return out;
 }
 const _a = {}, _b = {};

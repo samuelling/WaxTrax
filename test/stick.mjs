@@ -7,13 +7,13 @@ const srv = http.createServer((req, res) => { const p = path.join(root, req.url 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', '--mute-audio'] });
 const errs = [];
-const where = `(() => { const w = window.__wax, L = w.S.L, b = w.b, r = Math.hypot(b.x, b.z); let phi = Math.atan2(-b.z, b.x); if (phi < 0) phi += 2 * Math.PI; const u = (L.R0 - r) / 10 - phi / (2 * Math.PI), n = Math.round(u), e = (u - n) * 10; return { t: w.S.time, rev: n + phi / (2 * Math.PI), e, v: b.speed, A: w.tel.cA, B: w.tel.cB }; })()`;
+const where = `(() => { const w = window.__wax, L = w.S.L, b = w.b, r = Math.hypot(b.x, b.z); let phi = Math.atan2(-b.z, b.x); if (phi < 0) phi += 2 * Math.PI; const u = (L.R0 - r) / L.pitch - phi / (2 * Math.PI), n = Math.round(u), e = (u - n) * L.pitch; return { t: w.S.time, rev: n + phi / (2 * Math.PI), e, v: b.speed, A: w.tel.cA, B: w.tel.cB }; })()`;
 const page = await browser.newPage(); await page.setViewport({ width: 320, height: 200 });
 page.on('pageerror', e => errs.push(e.message));
 await page.goto('http://localhost:8767/'); await page.waitForFunction(() => window.__wax && !window.__wax.S.loading, { timeout: 120000 });
 await page.evaluate(() => { document.querySelector('[data-mode=free]').click(); document.getElementById('go').click(); });
 await sleep(1500);
-const place = () => page.evaluate(() => window.__wax.place(5, 60));
+const place = () => page.evaluate(() => window.__wax.place(2.5, 60));
 // game-time wait (swiftshader runs slower than real time)
 const waitGame = async (secs, each) => { const t0 = (await page.evaluate(where)).t; for (;;) { await sleep(40); const s = await page.evaluate(where); if (each) each(s); if (s.t - t0 >= secs) return s; } };
 for (const st of [0, 0.25, 0.5, 0.75, 1]) {

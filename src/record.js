@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { TAU, PITCH, DEPTH, R_END, R_LABEL, R_SPINDLE, LEAD_IN, taper, shapeF, warpH, warpAt } from './config.js';
+import { TAU, DEPTH, R_END, R_LABEL, R_SPINDLE, LEAD_IN, taper, shapeF, warpH, warpAt } from './config.js';
 import { VINYL_VERT, VINYL_FRAG } from './shaders.js';
 
 function buildGeometry(L, K) {
   const pos = [], idx = [];
-  const P = PITCH, D = DEPTH;
+  const P = L.pitch, D = DEPTH;
   // disc (r, phi, height) → world, through the world's shape and warp
   const put = (r, phi, h) => { const f = shapeF(L, phi), rw = r * f; pos.push(rw * Math.cos(phi), h * f + warpH(L, r, phi), -rw * Math.sin(phi)); };
   // spiral strip: land | wall | crease | wall | land
@@ -104,7 +104,7 @@ export class Record {
     this.uniforms = {
       uTime: { value: 0 }, uSkyRot: { value: 0 }, uSpec: { value: new Float32Array(32) }, uBass: { value: 0 },
       uGroove: { value: dummy }, uTW: { value: 2048 }, uLevOff: { value: new Float32Array(16) }, uLevN: { value: new Float32Array(16).fill(1) }, uNumLev: { value: 1 },
-      uR0: { value: 300 }, uPitch: { value: PITCH }, uDepth: { value: DEPTH }, uTotalRevs: { value: 0 }, uLeadIn: { value: LEAD_IN }, uTexPerRev: { value: 1000 },
+      uR0: { value: 300 }, uPitch: { value: 10 }, uRot: { value: 0 }, uSweep: { value: -10 }, uSweepAmt: { value: 0 }, uDepth: { value: DEPTH }, uTotalRevs: { value: 0 }, uLeadIn: { value: LEAD_IN }, uTexPerRev: { value: 1000 },
       uTraceGain: { value: 1 }, uREdge: { value: 320 }, uRLabel: { value: R_LABEL }, uREnd: { value: R_END },
       uProg: { value: 0 }, uBlur: { value: 0 }, uHead: { value: 1 }, uTipGlow: { value: 0.5 }, uPulse: { value: 0 },
       uBuggy: { value: new THREE.Vector3() }, uBuggyFwd: { value: new THREE.Vector3(1, 0, 0) }, uTip: { value: new THREE.Vector3() },
@@ -134,7 +134,7 @@ export class Record {
   }
   setSong(L, tex, title, sub, hue) {
     this.layout = L;
-    if (this.mesh) { this.scene.remove(this.mesh); this.mesh.geometry.dispose(); }
+    if (this.mesh) { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); }
     const K = this.quality.mobile ? 360 : 600;
     this.mesh = new THREE.Mesh(buildGeometry(L, K), this.material); this.mesh.frustumCulled = false; this.scene.add(this.mesh);
     if (this.grooveTex) this.grooveTex.dispose();
@@ -143,7 +143,7 @@ export class Record {
     const u = this.uniforms;
     u.uGroove.value = t; u.uTW.value = tex.TW; u.uNumLev.value = tex.levels.length;
     for (let i = 0; i < 16; i++) { const l = tex.levels[Math.min(i, tex.levels.length - 1)]; u.uLevOff.value[i] = l.off; u.uLevN.value[i] = l.n; }
-    u.uR0.value = L.R0; u.uTotalRevs.value = L.totalRevs; u.uTexPerRev.value = tex.texPerRev; u.uREdge.value = L.R_EDGE;
+    u.uR0.value = L.R0; u.uTotalRevs.value = L.totalRevs; u.uTexPerRev.value = tex.fs * L.tRev / tex.dec; u.uPitch.value = L.pitch; u.uREdge.value = L.R_EDGE;
     // scale the traces so a typical loud passage swings most of the way across its wall
     let ss = 0; for (let i = 0; i < tex.env.length; i++) ss += tex.env[i] * tex.env[i];
     const rms = Math.sqrt(ss / tex.env.length) || 0.3;

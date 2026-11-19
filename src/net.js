@@ -7,7 +7,8 @@ export class Net {
     const meta = document.querySelector('meta[name="wax-server"]')?.content || '';
     const h = location.hostname;
     const sameHost = location.protocol.startsWith('http') && !/github\.io$|claude|anthropic|^$/.test(h);
-    const pick = saved || meta || (sameHost ? location.host : '');
+    // a saved address wins; then the page's own host when the Worker serves it; the meta tag is for copies hosted elsewhere
+    const pick = saved || (sameHost ? location.host : '') || meta;
     if (!pick) return '';
     const host = pick.replace(/^\w+:\/\//, '').replace(/\/+$/, '');
     const secure = !/^(localhost|127\.|\[::1\])/.test(host);

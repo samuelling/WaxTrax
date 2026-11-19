@@ -12,13 +12,14 @@ export class StylusDriver {
   }
   onMessage(m) {
     if (m.type === 'record') { this.sim.setRecord(m); this.ready = true; this.snap = true; this.haveCtl = false; }
+    else if (m.type === 'layout') { const s = this.sim; s.spr = m.spr; s.totalRevs = m.totalRevs; s.leadIn = m.leadIn; s.P = m.pitchUm; this.snap = true; }
     else if (m.type === 'ctl') { this.c = m; this.haveCtl = true; if (m.snap) this.snap = true; }
     else if (m.type === 'set') { if (m.gain != null) this.gainT = m.gain; if (m.vtf != null) this.sim.VTF = m.vtf * 9806.65; if (m.noise != null) this.sim.noiseGain = m.noise; }
     else if (m.type === 'eject') { this.ready = false; this.sim.setRecord({ dA: null, dB: null, spr: this.sim.spr, leadIn: 1, totalRevs: 0, sens: 1 }); }
   }
   render(L, R, total, time) {
     if (!this.ready || !this.haveCtl) { L.fill(0); R.fill(0); return; }
-    const fs = this.fs, sim = this.sim, P = GROOVE.P;
+    const fs = this.fs, sim = this.sim, P = sim.P;
     for (let o = 0; o < total; o += 128) {
       const n = Math.min(128, total - o), c = this.c;
       let dtc = time + o / fs - c.t; if (dtc > 0.3) dtc = 0.3; else if (dtc < -0.1) dtc = -0.1;
