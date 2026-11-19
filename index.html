@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Address of the race server (the Cloudflare Worker), for copies of the game hosted elsewhere, e.g. waxtrax.your-name.workers.dev -->
+<meta name="wax-server" content="">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Wax Rally</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%230a0612%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27none%27 stroke=%27%2319e3ff%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23ff2a7f%27/%3E%3C/svg%3E">
@@ -55,7 +57,7 @@ button:focus-visible, label:focus-within, .seg button:focus-visible { outline: 3
 #strobe { width: min(46vw, 320px); height: 14px; display: block; margin: 4px auto 0; border-radius: 7px; background: #05030a; border: 1.5px solid rgba(255,42,127,.6); }
 .br { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: 12px; padding: 8px; }
 #vu { width: 150px; height: 112px; display: block; }
-#toasts { position: absolute; left: 0; right: 0; top: 17%; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#toasts { position: absolute; left: 0; right: 0; top: 19%; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .toast { font-family: var(--display); font-size: clamp(22px, 5vw, 54px); color: var(--paper); text-shadow: 4px 4px 0 var(--hot), -3px -3px 0 var(--cyan), 0 0 34px rgba(255,255,255,.5); animation: pop 1.5s cubic-bezier(.2,1.4,.3,1) forwards; white-space: nowrap; }
 .toast small { display: block; font-family: var(--body); font-weight: 700; font-size: .36em; color: var(--sun); text-shadow: none; letter-spacing: .12em; }
 @keyframes pop { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 14% { transform: scale(1.12) rotate(-3deg); opacity: 1; } 70% { transform: scale(1) rotate(-3deg); opacity: 1; } 100% { transform: scale(1.3) rotate(-3deg) translateY(-30px); opacity: 0; } }
@@ -91,7 +93,32 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
 .tracks button[aria-pressed="true"], .upload.sel { border-color: var(--hot); background: rgba(255,42,127,.22); box-shadow: 0 0 18px rgba(255,42,127,.4); }
 .upload { cursor: pointer; border-style: dashed; border-color: var(--cyan); }
 .upload input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+#racePanel { display: grid; gap: 10px; padding: 10px; border-radius: 14px; border: 2px dashed rgba(255,210,58,.5); }
+.fields label { display: grid; gap: 2px; font-size: 12px; font-weight: 700; color: var(--dim); letter-spacing: .06em; }
+.fields input { font: inherit; font-weight: 700; color: var(--paper); background: rgba(10,6,18,.7); border: 2px solid rgba(184,166,214,.5); border-radius: 10px; padding: 7px 10px; width: 9.5em; -webkit-user-select: text; user-select: text; }
+#server { width: min(22em, 70vw); }
+.fields button { align-self: end; padding: 8px 14px; border-radius: 10px; border: 2px solid var(--cyan); background: rgba(10,6,18,.6); font-weight: 700; }
+#lobby .code { font-family: var(--display); font-size: 26px; color: var(--sun); letter-spacing: .12em; }
+#lobby ul, .standings, #board { margin: 4px 0; padding: 0; list-style: none; }
+#lobby li::before, #board li::before { content: ""; display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: var(--c, #fff); margin-right: .5em; }
+#lobby li { font-weight: 700; }
+#lobby small { color: var(--dim); font-weight: 600; }
+.standings { counter-reset: p; font-family: var(--body); font-weight: 700; font-size: 16px; color: var(--paper); }
+.standings li { counter-increment: p; }
+.standings li::before { content: counter(p) ". "; color: var(--cyan); }
+.standings li.me { color: var(--sun); }
+body.locked #tracks, body.locked #worlds, body.locked #uploadLabel { opacity: .5; pointer-events: none; }
+#raceHud { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); text-align: center; display: grid; justify-items: center; gap: 3px; }
+#item { font-family: var(--display); font-size: clamp(13px, 2.4vw, 20px); padding: 5px 16px; border-radius: 12px; border: 3px solid var(--c, rgba(184,166,214,.5)); color: var(--c, rgba(184,166,214,.7)); background: rgba(10,6,18,.72); min-width: 8em; }
+#item.has { box-shadow: 0 0 22px var(--c); color: var(--paper); }
+#status2 { font-weight: 700; letter-spacing: .1em; color: var(--sun); min-height: 1.2em; font-size: 13px; }
+#board { position: absolute; margin: 0; left: max(14px, env(safe-area-inset-left)); top: 136px; text-align: left; counter-reset: p; font-weight: 700; font-size: 13px; text-shadow: 0 1px 3px #000; }
+#board li { counter-increment: p; opacity: .85; }
+#board li.me { color: var(--sun); opacity: 1; }
+body.touch #board { display: none; }
+body.touch #raceHud { top: auto; bottom: 104px; }
+body.racing #score { font-size: clamp(24px, 4vw, 40px); }
 .seg button { padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(184,166,214,.45); background: rgba(10,6,18,.6); text-align: left; }
 .seg button b { display: block; font-family: var(--display); font-weight: 400; font-size: 16px; }
 .seg button small { color: var(--dim); font-weight: 600; }
@@ -118,6 +145,8 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
     <div><div id="trk">Needle Drop</div><div id="time">0:00 / 0:00</div><div id="modeBadge">FOLLOW</div></div>
   </div>
   <div class="tr"><div id="score">000000</div><div id="combo"></div></div>
+  <div id="raceHud" hidden><div id="item">NO ITEM</div><div id="status2"></div></div>
+  <ol id="board" hidden></ol>
   <div class="btns"><button id="bMode" type="button">MODE</button><button id="bCam" type="button">CAM</button><button id="bMenu" type="button">MENU</button><button id="bFull" type="button" aria-label="Full screen">⛶</button></div>
   <div class="bl panel">
     <canvas id="scope" width="224" height="224" aria-label="Stylus motion in the groove, seen end-on"></canvas>
@@ -146,10 +175,28 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
     <h2>PICK A SIDE</h2>
     <div class="tracks" id="tracks"></div>
     <label class="upload" id="uploadLabel"><input type="file" id="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac"><b>Cut your own record</b><small id="uploadHint">Choose or drop an audio file. It stays on your device.</small></label>
+    <h2>PICK A WORLD</h2>
+    <div class="tracks" id="worlds"></div>
     <h2>HOW DO YOU WANT TO RIDE</h2>
     <div class="seg" id="modes">
       <button type="button" data-mode="follow" aria-pressed="true"><b>Follow</b><small>Locked in the groove. You control the speed: pitch up, brake, spin it backwards.</small></button>
       <button type="button" data-mode="free" aria-pressed="false"><b>Free drive</b><small>Steer anywhere. Climb walls, hop grooves, scrape across the whole side.</small></button>
+      <button type="button" data-mode="race" aria-pressed="false"><b>Race</b><small>One groove, three lanes. Ramps, boosts, items and dust bunnies. First to the label wins.</small></button>
+    </div>
+    <div id="racePanel" hidden>
+      <div class="seg two" id="raceKind">
+        <button type="button" data-kind="bots" aria-pressed="true"><b>Versus bots</b><small>Five rivals, right now. Any track, any world.</small></button>
+        <button type="button" data-kind="online" aria-pressed="false"><b>Online room</b><small>Up to eight players on the built-in tracks.</small></button>
+      </div>
+      <div id="online" hidden>
+        <div class="row fields">
+          <label for="pname">Name <input id="pname" maxlength="14" autocomplete="off" placeholder="You"></label>
+          <label for="room">Room <input id="room" maxlength="8" autocomplete="off" placeholder="ABCD"></label>
+          <button id="bCreate" type="button">Create room</button><button id="bJoin" type="button">Join</button><button id="bLeave" type="button" hidden>Leave room</button>
+        </div>
+        <div class="row fields" id="srvRow"><label for="server">Race server <input id="server" autocomplete="off" placeholder="waxtrax.your-name.workers.dev"></label></div>
+        <div id="lobby"></div>
+      </div>
     </div>
     <div class="row"><button id="go" type="button">Drop the needle</button><div id="status">Loading…</div></div>
     <ul class="keys" id="keys">
@@ -158,8 +205,9 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
       <li><kbd>Shift</kbd> nitro · <kbd>Space</kbd> handbrake</li>
       <li><kbd>M</kbd> follow / free · <kbd>C</kbd> camera</li>
       <li><kbd>R</kbd> back to the groove · <kbd>Esc</kbd> menu</li>
+      <li>Race: <kbd>A</kbd><kbd>D</kbd> change lane · <kbd>Shift</kbd> use item, or trick in the air</li>
     </ul>
-    <p class="fine">The three built-in tracks were synthesized from scratch for this game. Sound comes from a simulated stylus: tip mass, cantilever compliance, tracking force and one-sided contact with each 45° groove wall, followed by RIAA playback EQ.</p>
+    <p class="fine">Online rooms run on a Cloudflare Worker and need the game opened from that Worker's address. The three built-in tracks were synthesized from scratch for this game. Sound comes from a simulated stylus: tip mass, cantilever compliance, tracking force and one-sided contact with each 45° groove wall, followed by RIAA playback EQ.</p>
   </div>
 </div>
 <script type="module" src="game.js"></script>

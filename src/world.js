@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SKY_VERT, SKY_FRAG } from './shaders.js';
-import { R_SPINDLE } from './config.js';
+import { R_SPINDLE, shapeF } from './config.js';
 
 export class Sparks {
   constructor(scene, n = 800) {
@@ -37,18 +37,13 @@ export class Sparks {
 export class World {
   constructor(scene, renderer, shared) {
     this.scene = scene; this.shared = shared;
-    this.skyMat = new THREE.ShaderMaterial({ uniforms: { uTime: shared.uTime, uSkyRot: shared.uSkyRot, uSpec: shared.uSpec, uBass: shared.uBass }, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false });
+    this.skyMat = new THREE.ShaderMaterial({ uniforms: shared, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false });
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), this.skyMat); this.sky.frustumCulled = false; this.sky.renderOrder = -10; scene.add(this.sky);
     // lights for the buggy (the vinyl does its own lighting in its shader)
     this.hemi = new THREE.HemisphereLight(0xff7ab0, 0x1a0630, 0.6); scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffb090, 2.2); scene.add(this.sun);
     this.spots = [0xff3fd0, 0x30d8ff, 0xffe030].map(c => { const l = new THREE.DirectionalLight(c, 1.3); scene.add(l); return l; });
-    // environment for reflections, baked once from the sky
-    try {
-      const pm = new THREE.PMREMGenerator(renderer); const es = new THREE.Scene(); const sk = new THREE.Mesh(this.sky.geometry, this.skyMat); sk.frustumCulled = false; es.add(sk);
-      const save = shared.uSpec.value.slice(); shared.uSpec.value.fill(0.45);
-      this.env = pm.fromScene(es, 0, 0.1, 100).texture; scene.environment = this.env; scene.environmentIntensity = 1.1; shared.uSpec.value.set(save); pm.dispose();
-    } catch (e) { console.warn('environment bake failed', e); }
+    this.renderer = renderer;
     // spindle and mirror ball
     const chrome = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.06 });
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(R_SPINDLE, R_SPINDLE, 26, 40), chrome); sp.position.y = 13; scene.add(sp);
@@ -71,14 +66,25 @@ export class World {
     this.sparks = new Sparks(scene, 900);
     this._c = new THREE.Color();
   }
-  setSong(L) {
+  setSong(L, platterTop = -3) {
     const n = this.speakers.children.length;
-    this.speakers.children.forEach((g, i) => { const a = i / n * Math.PI * 2 + 0.3, r = L.R_EDGE + 20; g.position.set(Math.cos(a) * r, -3, -Math.sin(a) * r); g.rotation.y = a; });
+    this.speakers.children.forEach((g, i) => { const a = i / n * Math.PI * 2 + 0.3, r = (L.R_EDGE + 20) * shapeF(L, a); g.position.set(Math.cos(a) * r, platterTop, -Math.sin(a) * r); g.rotation.y = a; });
+    const t = L.world.theme; this.sunEl = t.sunEl; this.hemi.color.setHex(t.hemi[0]); this.hemi.groundColor.setHex(t.hemi[1]); this.sun.color.setRGB(t.sunLight[0], t.sunLight[1], t.sunLight[2]).multiplyScalar(0.4);
+    this.bakeEnv();
+  }
+  // environment for reflections on the buggies, baked from the current sky
+  bakeEnv() {
+    try {
+      const sh = this.shared, pm = new THREE.PMREMGenerator(this.renderer), es = new THREE.Scene(), sk = new THREE.Mesh(this.sky.geometry, this.skyMat); sk.frustumCulled = false; es.add(sk);
+      const save = sh.uSpec.value.slice(), rot = sh.uSkyRot.value; sh.uSpec.value.fill(0.45); sh.uSkyRot.value = 0;
+      const old = this.env; this.env = pm.fromScene(es, 0, 0.1, 100).texture; this.scene.environment = this.env; this.scene.environmentIntensity = 1.1;
+      sh.uSpec.value.set(save); sh.uSkyRot.value = rot; pm.dispose(); if (old) old.dispose();
+    } catch (e) { console.warn('environment bake failed', e); }
   }
   update(dt, time, rot, bass, level) {
     const sh = this.shared; sh.uTime.value = time; sh.uSkyRot.value = rot; sh.uBass.value = bass;
-    const sx = Math.cos(rot) * 0.98058, sz = Math.sin(rot) * 0.98058; sh.uSunDir.value.set(sx, 0.19612, sz);
-    this.sun.position.set(sx * 100, 19.6, sz * 100);
+    const el = this.sunEl ?? 0.2, il = 1 / Math.hypot(1, el), sx = Math.cos(rot) * il, sz = Math.sin(rot) * il; sh.uSunDir.value.set(sx, el * il, sz);
+    this.sun.position.set(sx * 100, el * il * 100, sz * 100);
     for (let i = 0; i < 3; i++) { const a = time * 0.55 + i * 2.094 + Math.sin(time * 0.3 + i) * 0.8; const d = sh.uLd.value[i]; d.set(Math.cos(a), 0.42 + 0.2 * Math.sin(time * 0.7 + i * 2), Math.sin(a)).normalize(); this.spots[i].position.copy(d).multiplyScalar(100); this.spots[i].intensity = 0.9 + bass * 2; const k = 1.2 + bass * 2.2; sh.uLc.value[i].set([2, 0.2, 1.8][i] * k, [0.3, 1.6, 1.5][i] * k, [1.6, 2, 0.2][i] * k); }
     if (this.scene.environmentRotation) this.scene.environmentRotation.y = rot;
     this.ball.rotation.y = time * 0.4;

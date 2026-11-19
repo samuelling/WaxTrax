@@ -1,0 +1,16 @@
+name = "waxtrax"
+main = "worker/index.js"
+compatibility_date = "2025-06-01"
+
+# The Worker serves the game itself, so the page and its race server share one address.
+[assets]
+directory = "./"
+binding = "ASSETS"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
