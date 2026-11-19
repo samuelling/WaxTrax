@@ -7,7 +7,7 @@ Open `index.html` from any static server (or GitHub Pages from the repository ro
 ## Modes
 
 - **Follow**: locked to the groove. Gas, brake and handbrake change the pitch, including backwards.
-- **Free drive**: steer anywhere. The groove holds the buggy like a rut until you steer out; then you can climb walls, catch air (the needle lifts) and hop grooves.
+- **Free drive**: steer anywhere. The groove holds the buggy like a rut until you steer out; then you can climb walls, catch air (the needle lifts) and hop grooves. **Track stickiness** (menu slider, or `[` `]` while driving, or the GRIP button on touch) sets how hard the groove holds you: Ice has no pull at all, so a buggy left alone skates off the curve; Rut (the middle) holds you hands-off and lets go after about half a second of full lock; Magnet reaches across the land to pull you into the nearest groove and holds on for about a second and a half.
 
 Keys: `W/S` or arrows for gas and brake, `A/D` to steer, `Shift` nitro, `Space` handbrake, `M` mode, `C` camera, `R` back to the groove, `Esc` menu. Touch and gamepad also work. Drop an audio file on the page to cut your own record.
 
@@ -56,6 +56,7 @@ npm run music        # re-renders the three built-in tracks (needs ffmpeg)
 npm run test:stylus  # tone response and clocking checks for the stylus model
 npm run dev          # the game and race server on localhost, through wrangler
 npm run test:online  # two headless browsers race each other through the local Worker
+node test/stick.mjs  # groove holding, taps and break-out time at each track stickiness
 ```
 
 The three built-in tracks are synthesized by `tools/music.mjs`. All geometry and textures are procedural.

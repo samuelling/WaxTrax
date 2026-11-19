@@ -15,6 +15,7 @@ import { Net } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const wrapPi = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 const damp = (dt, rate) => 1 - Math.exp(-dt * rate);
@@ -60,7 +61,17 @@ setupComposer();
 addEventListener('resize', setupComposer);
 
 // ───────────────────────────────────────── state
-const S = { phase: 'menu', mode: 'follow', choice: 'follow', L: null, song: null, cam: 0, time: 0, score: 0, rot: 0, selected: 0, flash: 0, shake: 0, pressed: null, started: false, loading: true, world: WORLDS[0] };
+const S = { phase: 'menu', mode: 'follow', choice: 'follow', L: null, song: null, cam: 0, time: 0, score: 0, rot: 0, selected: 0, flash: 0, shake: 0, pressed: null, started: false, loading: true, world: WORLDS[0], stick: 0.5 };
+try { const v = parseFloat(localStorage.getItem('wax.stick')); if (v >= 0 && v <= 1) S.stick = v; } catch (e) { /* storage unavailable */ }
+const STICK_NAMES = [[0.12, 'Ice'], [0.38, 'Loose'], [0.62, 'Rut'], [0.87, 'Glue'], [1.01, 'Magnet']];
+const stickName = (v) => STICK_NAMES.find(([t]) => v < t)[1];
+function setStick(v, announce) {
+  S.stick = clamp(Math.round(v * 20) / 20, 0, 1); try { localStorage.setItem('wax.stick', String(S.stick)); } catch (e) { /* storage unavailable */ }
+  const el = document.getElementById('stick'); if (el) el.value = String(Math.round(S.stick * 100));
+  const o = document.getElementById('stickOut'); if (o) o.textContent = `${stickName(S.stick)} · ${Math.round(S.stick * 100)}%`;
+  if (document.getElementById('modeBadge')) updateModeUI();
+  if (announce) toast(`${stickName(S.stick).toUpperCase()}`, `track stickiness ${Math.round(S.stick * 100)}%`);
+}
 const b = { x: 0, z: 0, y: 0, vy: 0, vx: 0, vz: 0, yaw: 0, q: 0.75, rate: 1, sway: 0, grounded: true, air: 0, gload: 1, prevHc: 0, phiU: 0, pitch: 0, roll: 0, speed: 0, qRate: 0.1, rhoRate: 0, wheelSpin: 0, steerVis: 0, airTime: 0, blend: new THREE.Vector3(), throttleVis: 0, lastN: 0, hops: 0, hopT: 0, lastSign: 1, scr: 0, scrT: 0, pocket: 0, donut: 0, boostVis: 0, finished: false };
 const g0 = {}, g1 = {}, sp = {};
 const onRail = () => (S.mode === 'follow' || S.mode === 'race') && !b.finished;
@@ -166,15 +177,30 @@ function stepFree(dt) {
   let yawRate = steer * vf / (7 + vf * vf / 100);
   if (hand && b.grounded) yawRate *= 1.8;
   if (!b.grounded) yawRate *= 0.4;
-  // the groove pulls a rolling buggy into line, the way a rut does; steering overrides it
+  // The groove pulls a rolling buggy into line, the way a rut does, and steering out breaks it.
+  // Track stickiness (S.stick, 0 = ice … 1 = magnet) sets how hard it pulls, how far from the
+  // centre line it reaches, and how much steering it takes to escape.
   grooveAt(L, b.x, b.z, g0);
-  if (b.grounded && g0.inGroove && Math.abs(g0.e) < DEPTH * 0.95 && Math.abs(vf) > 4 && !b.finished) {
-    const w = 1 - Math.min(1, Math.abs(steer) * 1.7);
+  const stk = S.stick, reach = DEPTH * 0.95 + Math.max(0, (stk - 0.6) / 0.4) * (PITCH / 2 - DEPTH * 0.95);
+  let lock = 0, gnx = 0, gnz = 0;
+  if (Math.abs(steer) < 0.2) b.strain = Math.max(0, (b.strain || 0) - 2 * dt);
+  if (stk > 0.01 && b.grounded && g0.inGroove && Math.abs(g0.e) < reach && Math.abs(vf) > 4 && !b.finished) {
+    const th = 0.6 * stk * stk; let w = 1 - sstep(th, th + 0.35, Math.abs(steer));
+    // above the middle setting the groove holds on for a moment against full lock before letting go
+    const T = Math.max(0, (stk - 0.5) / 0.5) * 1.1;
+    if (w < 1) b.strain = (b.strain || 0) + dt * (1 - w); else b.strain = Math.max(0, (b.strain || 0) - 2 * dt);
+    if (T > 0) w += (1 - w) * (1 - clamp((b.strain || 0) / T, 0, 1));
     spiralFrame(L, g0.rev, g0.e, sp); const tx = Math.cos(sp.yaw), tz = -Math.sin(sp.yaw), vt = b.vx * tx + b.vz * tz, dir = vt >= 0 ? 1 : -1;
+    // the groove's outward normal, for the centring spring below
+    gnx = -tz; gnz = tx; if (gnx * b.x + gnz * b.z < 0) { gnx = -gnx; gnz = -gnz; }
     // heading that runs along the groove (either way round) and eases back to its centre line
     let yT = sp.yaw - dir * clamp(g0.e * 0.06, -0.2, 0.2);
     let d = wrapPi(yT - b.yaw); if (Math.abs(d) > Math.PI / 2) d = wrapPi(d + Math.PI + dir * 2 * clamp(g0.e * 0.06, -0.2, 0.2));
-    if (Math.abs(d) < 0.8) { b.yaw += (vt / sp.mPerRev * TAU) * dt * w + d * damp(dt, 9 * w); }
+    if (Math.abs(d) < 0.8 + 0.6 * stk) {
+      lock = w;
+      // the rut turns the buggy with its curve for as long as the wheels are in it; steering only breaks the pull back to centre
+      b.yaw += (vt / sp.mPerRev * TAU) * dt * Math.min(1, stk * 2) + d * damp(dt, 25 * Math.pow(stk, 1.5) * w);
+    }
   }
   b.yaw += yawRate * dt;
   cy = Math.cos(b.yaw); sy = Math.sin(b.yaw);
@@ -182,6 +208,12 @@ function stepFree(dt) {
   if (b.grounded) {
     const d = 0.7, gx = (terrain(L, b.x + d, b.z) - terrain(L, b.x - d, b.z)) / (2 * d), gz = (terrain(L, b.x, b.z + d) - terrain(L, b.x, b.z - d)) / (2 * d);
     b.vx -= 24 * gx * dt; b.vz -= 24 * gz * dt;
+  }
+  // above the middle setting, a spring toward the groove's centre line (e > 0 is toward the spindle)
+  if (lock > 0 && stk > 0.5) {
+    const k = (stk - 0.5) / 0.5, vOut = b.vx * gnx + b.vz * gnz;
+    const a = clamp((50 * g0.e * g0.f - 12 * vOut) * k * lock, -140, 140);
+    b.vx += a * gnx * dt; b.vz += a * gnz * dt;
   }
   const px = b.x, pz = b.z, pr = g0.r;
   b.x += b.vx * dt; b.z += b.vz * dt;
@@ -238,7 +270,8 @@ function setMode(m, announce = true) {
 }
 function toggleMode() { if (S.phase !== 'play' || S.mode === 'race') return; S.choice = S.mode === 'follow' ? 'free' : 'follow'; setMode(S.choice); }
 function updateModeUI() {
-  const mb = $('modeBadge'); mb.textContent = S.mode === 'race' ? 'RACE' : S.mode === 'follow' ? 'FOLLOW' : 'FREE DRIVE'; mb.className = S.mode === 'free' ? 'free' : '';
+  const mb = $('modeBadge'); mb.textContent = S.mode === 'race' ? 'RACE' : S.mode === 'follow' ? 'FOLLOW' : `FREE · ${stickName(S.stick).toUpperCase()}`;
+  $('freePanel').hidden = S.choice !== 'free'; $('bStick').hidden = S.mode !== 'free'; mb.className = S.mode === 'free' ? 'free' : '';
   $('racePanel').hidden = S.choice !== 'race'; $('bMode').hidden = S.mode === 'race'; $('raceHud').hidden = S.mode !== 'race'; $('board').hidden = S.mode !== 'race'; $('tBoost').textContent = S.mode === 'race' ? 'ITEM' : 'NOS'; $('tGas').style.opacity = S.mode === 'race' ? '0.35' : ''; document.body.classList.toggle('racing', S.mode === 'race');
   document.querySelectorAll('#modes button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.mode === S.choice)));
 }
@@ -295,6 +328,7 @@ addEventListener('keydown', (e) => {
   if (S.phase === 'play' || S.phase === 'done') {
     if (k === 'm' || k === 'Tab') { e.preventDefault(); toggleMode(); }
     else if (k === 'c') nextCam();
+    else if ((k === '[' || k === ']') && S.mode === 'free') setStick(S.stick + (k === ']' ? 0.1 : -0.1), true);
     else if (k === 'r') { if (S.mode === 'free' && S.phase === 'play') { S.choice = 'follow'; setMode('follow'); } }
     else if (k === 'Escape' || k === 'p') showMenu();
   } else if (S.phase === 'menu' && (k === 'Enter') && !S.loading) start();
@@ -358,6 +392,8 @@ $('go').addEventListener('click', () => { if (audio.ctx) { try { audio.ctx.resum
 $('bFull').addEventListener('click', () => { try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = document.documentElement.requestFullscreen?.(); if (p && p.catch) p.catch(() => {}); } } catch (e) { /* not allowed here */ } });
 $('bMode').addEventListener('click', () => toggleMode());
 $('bCam').addEventListener('click', () => nextCam());
+$('bStick').addEventListener('click', () => { const presets = [0, 0.25, 0.5, 0.75, 1]; const i = presets.findIndex(p => p > S.stick + 0.01); setStick(presets[i < 0 ? 0 : i], true); });
+$('stick').addEventListener('input', (e) => setStick(+e.target.value / 100, false));
 $('bMenu').addEventListener('click', () => showMenu());
 function showMenu(result) {
   if (S.mode === 'race' && S.started && net && S.phase === 'play') { endRace(); result = 'You left the race.'; }
@@ -681,6 +717,7 @@ function frame(now) {
 }
 
 document.addEventListener('visibilitychange', () => { if (document.hidden && S.phase === 'play' && !(S.mode === 'race' && net)) showMenu(); });
+setStick(S.stick, false);
 updateModeUI();
 if (touchDevice) $('keys').hidden = true;
 const relabel = () => { if (S.song && S.L) { drawLabel(record.labelCanvas, S.song.title, S.song.sub, S.song.hue); record.labelTex.needsUpdate = true; } };
@@ -688,3 +725,5 @@ const relabel = () => { if (S.song && S.L) { drawLabel(record.labelCanvas, S.son
 loadSong(TRACKS[0]);
 requestAnimationFrame(frame);
 window.__wax = { S, b, tel, audio, inp, keys, setMode, start, nextCam, record, world, applyWorld, WORLDS, race, getNet: () => net };
+// test hook: put the buggy in groove q, lined up and rolling at v m/s
+window.__wax.place = (q, v) => { b.q = q; b.sway = 0; placeOnSpiral(); b.vx = Math.cos(b.yaw) * v; b.vz = -Math.sin(b.yaw) * v; b.y = wheelAvg(b.x, b.z, b.yaw); b.vy = 0; b.prevHc = b.y; b.strain = 0; b.grounded = true; b.blend.set(0, 0, 0); camSnap = true; };

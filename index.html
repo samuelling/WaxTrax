@@ -94,6 +94,15 @@ h2 { margin: 6px 0 0; font-family: var(--display); font-size: 15px; letter-spaci
 .upload { cursor: pointer; border-style: dashed; border-color: var(--cyan); }
 .upload input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+#freePanel { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 2px dashed rgba(25,227,255,.5); }
+#freePanel small { color: var(--dim); font-weight: 600; max-width: 62ch; }
+.slider { display: grid; grid-template-columns: auto 1fr 7.5em; gap: 12px; align-items: center; font-family: var(--display); font-size: 15px; color: var(--cyan); }
+.slider output { font-family: var(--body); font-weight: 700; color: var(--sun); font-variant-numeric: tabular-nums; text-align: right; }
+.slider input { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #9fe7ff, var(--cyan) 30%, var(--sun) 60%, var(--hot)); outline: none; touch-action: pan-x; }
+.slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 0 12px var(--cyan); cursor: pointer; }
+.slider input::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 0 12px var(--cyan); cursor: pointer; }
+.slider input:focus-visible { outline: 3px solid var(--sun); outline-offset: 4px; }
+@media (max-width: 520px) { .slider { grid-template-columns: 1fr 7em; } .slider span { grid-column: 1 / -1; } }
 #racePanel { display: grid; gap: 10px; padding: 10px; border-radius: 14px; border: 2px dashed rgba(255,210,58,.5); }
 .fields label { display: grid; gap: 2px; font-size: 12px; font-weight: 700; color: var(--dim); letter-spacing: .06em; }
 .fields input { font: inherit; font-weight: 700; color: var(--paper); background: rgba(10,6,18,.7); border: 2px solid rgba(184,166,214,.5); border-radius: 10px; padding: 7px 10px; width: 9.5em; -webkit-user-select: text; user-select: text; }
@@ -147,7 +156,7 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
   <div class="tr"><div id="score">000000</div><div id="combo"></div></div>
   <div id="raceHud" hidden><div id="item">NO ITEM</div><div id="status2"></div></div>
   <ol id="board" hidden></ol>
-  <div class="btns"><button id="bMode" type="button">MODE</button><button id="bCam" type="button">CAM</button><button id="bMenu" type="button">MENU</button><button id="bFull" type="button" aria-label="Full screen">⛶</button></div>
+  <div class="btns"><button id="bMode" type="button">MODE</button><button id="bStick" type="button" hidden aria-label="Change track stickiness">GRIP</button><button id="bCam" type="button">CAM</button><button id="bMenu" type="button">MENU</button><button id="bFull" type="button" aria-label="Full screen">⛶</button></div>
   <div class="bl panel">
     <canvas id="scope" width="224" height="224" aria-label="Stylus motion in the groove, seen end-on"></canvas>
     <div class="lamps"><span id="lampL">L WALL</span><span id="lampR">R WALL</span><span id="lampLand">LAND</span><span id="lampAir">AIR</span><small>STYLUS</small></div>
@@ -183,6 +192,10 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
       <button type="button" data-mode="free" aria-pressed="false"><b>Free drive</b><small>Steer anywhere. Climb walls, hop grooves, scrape across the whole side.</small></button>
       <button type="button" data-mode="race" aria-pressed="false"><b>Race</b><small>One groove, three lanes. Ramps, boosts, items and dust bunnies. First to the label wins.</small></button>
     </div>
+    <div id="freePanel" hidden>
+      <label for="stick" class="slider"><span>Track stickiness</span><input type="range" id="stick" min="0" max="100" step="5" value="50"><output id="stickOut" for="stick">Rut · 50%</output></label>
+      <small>How hard the groove holds you. Ice lets you skate straight across the grooves; Magnet pulls you into the nearest one and keeps you there until you steer hard out of it.</small>
+    </div>
     <div id="racePanel" hidden>
       <div class="seg two" id="raceKind">
         <button type="button" data-kind="bots" aria-pressed="true"><b>Versus bots</b><small>Five rivals, right now. Any track, any world.</small></button>
@@ -204,6 +217,7 @@ body.racing #score { font-size: clamp(24px, 4vw, 40px); }
       <li><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> steer</li>
       <li><kbd>Shift</kbd> nitro · <kbd>Space</kbd> handbrake</li>
       <li><kbd>M</kbd> follow / free · <kbd>C</kbd> camera</li>
+      <li>Free drive: <kbd>[</kbd><kbd>]</kbd> track stickiness</li>
       <li><kbd>R</kbd> back to the groove · <kbd>Esc</kbd> menu</li>
       <li>Race: <kbd>A</kbd><kbd>D</kbd> change lane · <kbd>Shift</kbd> use item, or trick in the air</li>
     </ul>
