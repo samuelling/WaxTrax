@@ -1,5 +1,5 @@
 import fs from 'fs';
-for (const name of ['needle-drop', 'dune-runner', 'wow-and-flutter']) {
+for (const name of (process.argv[2] || 'needle-drop,dune-runner,wow-and-flutter').split(',')) {
   const b = fs.readFileSync(`/tmp/${name}.wav`), sr = b.readUInt32LE(24), n = (b.length - 44) / 4;
   const L = new Float32Array(n), R = new Float32Array(n); for (let i = 0; i < n; i++) { L[i] = b.readInt16LE(44 + i * 4) / 32768; R[i] = b.readInt16LE(46 + i * 4) / 32768; }
   const band = (x, lo, hi) => { // crude 2-pole band energy via one-pole pairs

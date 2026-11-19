@@ -4,7 +4,7 @@
 //   GET /ws/<ROOM>   WebSocket for a room (3-8 letters or digits)
 //   anything else    the game's static files
 const MAX_PLAYERS = 8, TICK_MS = 80, RACE_GRACE_MS = 25000;
-const SONGS = ['needle-drop', 'dune-runner', 'wow-and-flutter'], WORLDS = ['night', 'dunes', 'flexi'];
+const SONGS = ['needle-drop', 'dune-runner', 'wow-and-flutter', 'spindle-spin', 'crate-digger', '8-bit-platter', 'dub-plate', 'turbo-tonearm'], WORLDS = ['night', 'dunes', 'flexi'];
 
 export default {
   async fetch(request, env) {

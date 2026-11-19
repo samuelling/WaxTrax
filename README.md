@@ -52,11 +52,11 @@ Across the groove, 1 µm of real record is about 9 cm of world, so the 110 µm p
 ```
 npm install
 npm run build        # bundles src/ into game.js and worklet.js
-npm run music        # re-renders the three built-in tracks (needs ffmpeg)
+npm run music        # re-renders the eight built-in tracks (needs ffmpeg)
 npm run test:stylus  # tone response and clocking checks for the stylus model
 npm run dev          # the game and race server on localhost, through wrangler
 npm run test:online  # two headless browsers race each other through the local Worker
 node test/stick.mjs  # groove holding, taps and break-out time at each track stickiness
 ```
 
-The three built-in tracks are synthesized by `tools/music.mjs`. All geometry and textures are procedural.
+The eight built-in tracks are synthesized by `tools/music.mjs`. All geometry and textures are procedural.

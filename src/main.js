@@ -24,6 +24,11 @@ const TRACKS = [
   { id: 'needle-drop', title: 'Needle Drop', sub: 'Electro-funk · 116 BPM', file: 'music/needle-drop.mp3', hue: 325, world: 'night' },
   { id: 'dune-runner', title: 'Dune Runner', sub: 'Synthwave · 104 BPM', file: 'music/dune-runner.mp3', hue: 28, world: 'dunes' },
   { id: 'wow-and-flutter', title: 'Wow & Flutter', sub: 'Drum & bass · 172 BPM', file: 'music/wow-and-flutter.mp3', hue: 188, world: 'flexi' },
+  { id: 'spindle-spin', title: 'Spindle Spin', sub: 'Filter house · 124 BPM', file: 'music/spindle-spin.mp3', hue: 275, world: 'night' },
+  { id: 'crate-digger', title: 'Crate Digger', sub: 'Lo-fi boom bap · 86 BPM', file: 'music/crate-digger.mp3', hue: 38, world: 'dunes' },
+  { id: '8-bit-platter', title: '8-Bit Platter', sub: 'Chiptune · 150 BPM', file: 'music/8-bit-platter.mp3', hue: 140, world: 'flexi' },
+  { id: 'dub-plate', title: 'Dub Plate', sub: 'Dub reggae · 74 BPM', file: 'music/dub-plate.mp3', hue: 2, world: 'night' },
+  { id: 'turbo-tonearm', title: 'Turbo Tonearm', sub: 'Acid big beat · 132 BPM', file: 'music/turbo-tonearm.mp3', hue: 55, world: 'dunes' },
 ];
 
 // ───────────────────────────────────────── renderer
